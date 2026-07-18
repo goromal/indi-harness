@@ -102,7 +102,7 @@ class PolynomialTrajectory:
             if len(c) == 0:
                 out.append(0.0)
                 continue
-            # Horner on the k-th derivative coefficients
+            # k-th derivative via coefficient shift-and-scale, then polyval
             dc = c.copy()
             for _ in range(k):
                 dc = dc[1:] * np.arange(1, len(dc))

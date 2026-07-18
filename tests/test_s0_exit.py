@@ -36,6 +36,14 @@ def test_feedforward_reduces_error():
     assert ff < 0.6 * fb, f"feedforward not earning its keep: ff={ff:.3f} fb={fb:.3f}"
 
 
+def test_feedforward_reduces_error_with_wind():
+    # design doc: "with and without" the wind+drag disturbance
+    wind = np.array([3.0, 0.0, 0.0])
+    ff = lem_run(wind, ff_on=True)
+    fb = lem_run(wind, ff_on=False)
+    assert ff < 0.6 * fb, f"feedforward not earning its keep in wind: ff={ff:.3f} fb={fb:.3f}"
+
+
 def test_disturbance_step_no_windup():
     pulse = lambda t: (np.array([4.0, 0.0, 0.0])
                        if 3.0 <= t < 4.0 else np.zeros(3))
