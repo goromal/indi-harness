@@ -14,7 +14,12 @@ class QuadParams:
     kf: float = 1.0e-5        # N / (rad/s)^2
     km: float = 1.6e-7        # N m / (rad/s)^2
     tau_m: float = 0.03       # motor time constant [s]
-    Ir: float = 6.0e-6        # rotor inertia [kg m^2]
+    # Rotor inertia must be physically consistent with the prop class implied
+    # by kf: the instantaneous yaw reaction to a commanded yaw torque has
+    # magnitude ratio Ir/(2*Omega_hover*km*tau_m); above ~1 the yaw loop is
+    # non-minimum-phase-unstable (observed as a wind-triggered limit cycle).
+    # 5e-7 gives ratio ~0.2 for this small-fast-prop parameter set.
+    Ir: float = 5.0e-7        # rotor inertia [kg m^2]
     Omega_min: float = 100.0  # rad/s
     Omega_max: float = 900.0
     drag_D: np.ndarray = None  # rotor-drag coeffs, body frame [N/(m/s)]
