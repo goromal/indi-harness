@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "indi-harness"
+version = "0.1.0"
+description = "Quaternion INDI prototype + trajectory harness (S0/S1 of the ArduPilot INDI plan)"
+requires-python = ">=3.10"
+dependencies = ["numpy", "pyyaml"]
+
+[project.optional-dependencies]
+plot = ["matplotlib"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
