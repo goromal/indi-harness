@@ -17,8 +17,8 @@ class QuadParams:
     # Rotor inertia must be physically consistent with the prop class implied
     # by kf: the instantaneous yaw reaction to a commanded yaw torque has
     # magnitude ratio Ir/(2*Omega_hover*km*tau_m); above ~1 the yaw loop is
-    # non-minimum-phase-unstable (observed as a wind-triggered limit cycle).
-    # 5e-7 gives ratio ~0.2 for this small-fast-prop parameter set.
+    # non-minimum-phase-unstable (observed as a wind-triggered limit cycle;
+    # 6e-6 gave ratio 1.26). 5e-7 gives ratio ~0.1 for this prop class.
     Ir: float = 5.0e-7        # rotor inertia [kg m^2]
     Omega_min: float = 100.0  # rad/s
     Omega_max: float = 900.0
