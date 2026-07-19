@@ -7,10 +7,13 @@ name = "indi-harness"
 version = "0.1.0"
 description = "Quaternion INDI prototype + trajectory harness (S0/S1 of the ArduPilot INDI plan)"
 requires-python = ">=3.10"
-dependencies = ["numpy", "pyyaml"]
+dependencies = ["numpy", "pyyaml", "pymavlink"]
 
 [project.optional-dependencies]
 plot = ["matplotlib"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["indi_harness*"]
