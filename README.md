@@ -39,3 +39,34 @@ Committed artifact: `baselines/s1_stock_sitl.json` (run 1).
 ```
 Reproduce: cd anixpkgs && nix-build pkgs/nixos/sitl-envs/s1-baseline.nix
 ```
+
+## S2 offboard SITL results
+
+Tracking RMSE of the **offboard** ROS 2 outer loop (`indi_harness.offboard`)
+flying the same battery through the stock inner loop via `SET_ATTITUDE_TARGET`
+(MAVLink 5790, `GUID_OPTIONS 8`), consuming `/ap/*` DDS state. Scored by the
+**same** XKF1 `.BIN` evaluator as S1, so the columns are directly comparable.
+Repeatability-checked across two fresh VM runs (`compare_baselines.py`,
+exit 0).
+
+| Case | S1 stock [m] | S2 offboard run 1 [m] | S2 run 2 [m] | Δ vs S1 |
+|------|-------------:|----------------------:|-------------:|--------:|
+| hover_step | 0.615 | 0.540 | 0.488 | −16% |
+| circle_slow | 0.271 | 0.757 | 0.756 | +179% |
+| circle_fast | 0.636 | 0.756 | 0.799 | +22% |
+| lemniscate_slow | 5.072 | 0.462 | 0.443 | −91% |
+| lemniscate_fast | 1.787 | 0.769 | 0.803 | −56% |
+
+The offboard loop flies stably at a consistent 0.44–0.80 m across all cases
+(vs S1's 0.27–5.07 m swing): the flatness feed-forward wins big on aggressive
+trajectories, while the ~27.7 Hz / ~35 ms offboard command cadence imposes a
+~0.5–0.8 m floor that costs accuracy on gentle ones. The battery flies with
+the flatness PD+ff path (`--no-indi`); the INDI acceleration increment is
+unstable offboard under command-path latency (carried to S3). Full analysis:
+[`docs/s2_latency_attribution.md`](docs/s2_latency_attribution.md).
+
+Committed artifact: `baselines/s2_offboard_sitl.json` (run 1).
+
+```
+Reproduce: cd anixpkgs && nix-build pkgs/nixos/sitl-envs/s2-offboard.nix
+```
