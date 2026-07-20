@@ -63,6 +63,30 @@ def newest_bin(logs_dir):
     return bins[-1]
 
 
+def evaluate_flown(flown, logs_dir):
+    """flown: list of (case, origin, FlightRecord). Scores each case's window
+    of the newest .BIN with the S1 evaluator; returns the results list."""
+    bin_path = newest_bin(logs_dir)
+    print(f"evaluating against {bin_path}", flush=True)
+    time_us, p_ned = read_ekf_pos(bin_path)
+    results = []
+    for case, origin, rec in flown:
+        traj_t, boot_ms, p_live, p_ref = rec.arrays()
+        k, b = boot_to_traj_map(traj_t, boot_ms)
+        origin_offset = origin - case.traj.ref(0.0).p
+        # only rows inside this case's flight window
+        t_traj_all = k * (time_us / 1000.0) + b
+        win = (t_traj_all >= 0.0) & (t_traj_all <= case.duration)
+        per_axis, total = evaluate_bin(time_us[win], p_ned[win], k, b,
+                                       case.traj, origin_offset, trim_s=2.0)
+        results.append({"case": case.name, "rmse_total": float(total),
+                        "rmse_axes": [float(x) for x in per_axis],
+                        "n_bin_samples": int(win.sum()), "source": "XKF1"})
+        print(f"  {case.name:<16} RMSE {total:.3f} m "
+              f"({int(win.sum())} BIN samples)", flush=True)
+    return results
+
+
 def run_battery(url, logs_dir, out_dir, cases=None):
     out = pathlib.Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -83,25 +107,7 @@ def run_battery(url, logs_dir, out_dir, cases=None):
         flown.append((case, origin, rec))
         time.sleep(3.0)  # let it settle between cases
 
-    bin_path = newest_bin(logs_dir)
-    print(f"evaluating against {bin_path}", flush=True)
-    time_us, p_ned = read_ekf_pos(bin_path)
-    results = []
-    for case, origin, rec in flown:
-        traj_t, boot_ms, p_live, p_ref = rec.arrays()
-        k, b = boot_to_traj_map(traj_t, boot_ms)
-        origin_offset = origin - case.traj.ref(0.0).p
-        # only rows inside this case's flight window
-        t_traj_all = k * (time_us / 1000.0) + b
-        win = (t_traj_all >= 0.0) & (t_traj_all <= case.duration)
-        per_axis, total = evaluate_bin(time_us[win], p_ned[win], k, b,
-                                       case.traj, origin_offset, trim_s=2.0)
-        results.append({"case": case.name, "rmse_total": float(total),
-                        "rmse_axes": [float(x) for x in per_axis],
-                        "n_bin_samples": int(win.sum()), "source": "XKF1"})
-        print(f"  {case.name:<16} RMSE {total:.3f} m "
-              f"({int(win.sum())} BIN samples)", flush=True)
-
+    results = evaluate_flown(flown, logs_dir)
     (out / "s1_baseline.json").write_text(results_json(results))
     print(f"wrote {out / 's1_baseline.json'}", flush=True)
     return results
