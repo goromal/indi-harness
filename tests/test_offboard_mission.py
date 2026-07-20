@@ -39,6 +39,18 @@ def pose_msg(t_s):
     return SimpleNamespace(header=SimpleNamespace(stamp=stamp), pose=pose)
 
 
+def test_on_imu_is_frd_passthrough():
+    # /ap/imu/experimental/data is published in FRD (base_link_ned); at hover
+    # the accelerometer specific force is [0,0,-g] and must reach the bridge
+    # unflipped. A FLU->FRD negation would corrupt f_b -> INDI divergence.
+    conn = FakeConn()
+    m = OffboardMission(conn, QuadParams(), hover_throttle=0.35)
+    msg = SimpleNamespace(linear_acceleration=SimpleNamespace(
+        x=0.1, y=0.2, z=-9.8))
+    m.on_imu(msg)
+    assert np.allclose(m.f_b, [0.1, 0.2, -9.8])
+
+
 def test_mission_streams_and_joins():
     conn = FakeConn()
     P = QuadParams()

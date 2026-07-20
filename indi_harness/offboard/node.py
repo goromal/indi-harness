@@ -34,9 +34,13 @@ class OffboardMission:
         self.done = False
 
     def on_imu(self, msg):
-        # sensor_msgs/Imu, FLU body -> FRD
+        # /ap/imu/experimental/data is already FRD (frame_id base_link_ned):
+        # linear_acceleration is the specific force in the autopilot body
+        # frame, matching the bridge convention (hover -> [0,0,-g]). Verified
+        # empirically in the VM (docs/apdds_audit.md): rest-state
+        # linear_acceleration.z = -9.8. No FLU->FRD flip.
         a = msg.linear_acceleration
-        self.f_b = np.array([a.x, -a.y, -a.z])
+        self.f_b = np.array([a.x, a.y, a.z])
 
     def on_twist(self, msg):
         tw = msg.twist.linear
