@@ -63,10 +63,35 @@ command-path latency, the previous-command specific force (`f_state`) and the
 IMU-measured specific force (`f_meas`) no longer cancel in the increment
 `f_cmd = f_state + (a_cmd − g) − f_meas`, so `f_cmd` winds up — observed
 commanded tilt >130° and thrust surrogate →1e4 before the vehicle flipped and
-flew off (>100 m). This is the design-doc's anticipated latency limitation
-made concrete; stabilizing INDI offboard needs a faster/lower-latency inner
-path (rate-loop / Layer-A, design-doc S3+). The flatness attitude+rate+thrust
-feed-forward is retained; only the accel increment is dropped.
+flew off (>100 m). The flatness attitude+rate+thrust feed-forward is retained;
+only the accel increment is dropped.
+
+**Root cause is de-synchronization, not "too much latency" (corrected).** An
+earlier draft of this doc concluded INDI-offboard "needs a faster/lower-latency
+inner path (S3)." An offline study (`tests/test_offboard_bridge.py::
+test_indi_needs_delay_alignment_under_latency`, and the `OffboardGains.
+cmd_delay_ticks` knob it exercises) shows that framing is imprecise. The INDI
+increment cancels *only if `f_state` and `f_meas` refer to the same instant's
+thrust*. Currently `f_state` is the command from **one tick** ago, but `f_meas`
+reflects the command actually realized ~(command-path latency) ticks ago — so
+the two are misaligned by the whole delay and the residual accumulates. Sweeping
+a modelled command-path delay: plain INDI is stable to ~75 ms, winds up by
+~110 ms, and diverges past ~185 ms, while PD+ff is flat throughout. **Delaying
+`f_state` to match the latency (`cmd_delay_ticks` ≈ latency in ticks) restores
+cancellation and recovers INDI to PD+ff quality (0.10–0.15 m) at every latency
+tested.** Anti-windup / clamping the fed-back command does **not** help (it only
+bounds the runaway into ~2–3 m tracking). Alignment tolerates *under*-estimating
+the latency but diverges if you *over*-estimate — so bias the estimate low.
+
+This is offline evidence (fixed-delay model, instant attitude, no jitter); it
+is *not* yet VM-confirmed, and the offboard alignment buffer is throwaway
+scaffolding regardless. The transferable point is for the **eventual onboard
+INDI** (ArduPilot firmware, design-doc S3+): the same synchronization
+requirement applies there — you match motor spin-up lag (~30 ms) and the IMU
+filter delay instead of a comms round-trip — so "low latency" alone does not
+make INDI safe; the actuator/sensor signals must be time-aligned before the
+increment. That is the real lesson, and it is what a firmware implementation
+must get right.
 
 **Is the S2↔S1 delta attributable to latency?** Partly, and the honest
 reading is more interesting than "uniform degradation":
@@ -101,5 +126,7 @@ and attributed — a constant offboard-cadence floor (~0.5–0.8 m, the latency
 signature) plus a flatness-feed-forward advantage that dominates on aggressive
 trajectories. Absolute-number parity with onboard control was never the S2
 goal (design-doc "known limitation"); consistent, stable, feed-forward-driven
-offboard tracking was, and it is met. The INDI-offboard-instability finding is
-carried to S3.
+offboard tracking was, and it is met. The INDI-offboard instability is
+understood (command/measurement de-synchronization, not irreducible latency)
+and its transferable lesson — time-align the actuator/sensor signals before the
+increment — is carried to the onboard S3 work.

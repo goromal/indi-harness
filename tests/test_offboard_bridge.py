@@ -1,3 +1,4 @@
+from collections import deque
 import numpy as np
 from indi_harness import quat
 from indi_harness.params import QuadParams
@@ -8,9 +9,10 @@ P = QuadParams()
 HOVER_THR = 0.35
 
 
-def make(fs=50.0, indi_accel=True):
-    return OffboardOuterLoop(P, OffboardGains(indi_accel=indi_accel),
-                             fs=fs, hover_throttle=HOVER_THR)
+def make(fs=50.0, indi_accel=True, cmd_delay_ticks=1):
+    return OffboardOuterLoop(
+        P, OffboardGains(indi_accel=indi_accel, cmd_delay_ticks=cmd_delay_ticks),
+        fs=fs, hover_throttle=HOVER_THR)
 
 
 def hover_state(p=np.array([0.0, 0.0, -10.0])):
@@ -73,3 +75,47 @@ def test_closed_loop_circle():
     assert closed_loop_rmse(indi_accel=True) < 0.15
     assert closed_loop_rmse(indi_accel=False) < 0.15
     assert closed_loop_rmse(indi_accel=True, fs=100.0) < 0.15
+
+
+def latency_rmse(indi_accel, cmd_delay_ticks=1, plant_delay=5, fs=27.0):
+    """Circle flown through a plant that realizes the attitude+thrust command
+    `plant_delay` ticks late (models the offboard DDS+MAVLink command path).
+    This is the INDI-offboard failure mode: f_meas lags the command, so the
+    INDI increment only cancels if f_state is delayed to match."""
+    ctl = make(fs=fs, indi_accel=indi_accel, cmd_delay_ticks=cmd_delay_ticks)
+    traj = Circle(radius=2.0, period=8.0, alt=10.0)
+    fo0 = traj.ref(0.0)
+    p, v = fo0.p.copy(), fo0.v.copy()
+    dt, errs = 1.0 / fs, []
+    q_prev = np.array([1.0, 0, 0, 0])
+    sf_world_prev = np.array([0.0, 0.0, -P.g])
+    buf = deque([(q_prev, HOVER_THR)] * plant_delay, maxlen=plant_delay)
+    for k in range(int(20.0 * fs)):
+        t = k * dt
+        sp = ctl.tick(t=t, traj=traj, p=p, v=v, q=q_prev,
+                      f_b=quat.qrot_inv(q_prev, sf_world_prev))
+        buf.append((sp.q, sp.fields()["thrust"]))
+        q_exec, thr_exec = buf[0]            # command realized plant_delay late
+        T = thr_exec / HOVER_THR * P.g
+        a = (np.array([0.0, 0.0, P.g])
+             + quat.qrot(q_exec, np.array([0.0, 0.0, -T])))
+        sf_world_prev = a - np.array([0.0, 0.0, P.g])
+        q_prev = q_exec
+        v = v + a * dt
+        p = p + v * dt
+        if t > 2.0:
+            errs.append(np.linalg.norm(p - traj.ref(t).p))
+    return float(np.sqrt(np.mean(np.square(errs))))
+
+
+def test_indi_needs_delay_alignment_under_latency():
+    # Default INDI (cmd_delay_ticks=1) winds up when the command path is
+    # latent; delay-aligning f_state to the command latency recovers it to
+    # PD+ff-quality tracking. This is the mechanism behind flying S2 with
+    # --no-indi (design-doc S2) — the fix is synchronization, not anti-windup.
+    diverged = latency_rmse(indi_accel=True, cmd_delay_ticks=1, plant_delay=5)
+    aligned = latency_rmse(indi_accel=True, cmd_delay_ticks=4, plant_delay=5)
+    pd_ff = latency_rmse(indi_accel=False, plant_delay=5)
+    assert diverged > 0.6, f"expected windup, got {diverged:.2f}"
+    assert aligned < 0.2, f"delay-aligned INDI should recover, got {aligned:.2f}"
+    assert pd_ff < 0.2, f"PD+ff should be latency-robust, got {pd_ff:.2f}"
