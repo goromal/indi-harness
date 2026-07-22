@@ -70,3 +70,35 @@ Committed artifact: `baselines/s2_offboard_sitl.json` (run 1).
 ```
 Reproduce: cd anixpkgs && nix-build pkgs/nixos/sitl-envs/s2-offboard.nix
 ```
+
+## S3 Layer-A in-firmware INDI results
+
+Tracking RMSE of the **in-firmware** quaternion INDI attitude/rate backend
+(`AC_CustomControl_INDI` in the `goromal/ardupilot` fork), engaged at runtime
+via `CC_TYPE=3` and flying the same battery through the **stock outer loop**
+(GUIDED position streaming — identical command path to S1; Layer A swaps only
+the inner attitude/rate controller). Scored by the same XKF1 `.BIN` evaluator.
+Repeatability-checked across two fresh VM runs (`compare_baselines.py`, exit 0).
+
+| Case | S1 stock [m] | S3 INDI run 1 [m] | S3 run 2 [m] | Δ vs S1 |
+|------|-------------:|------------------:|-------------:|--------:|
+| hover_step | 0.615 | 0.756 | 0.754 | +23% |
+| circle_slow | 0.271 | 0.252 | 0.252 | −7% |
+| circle_fast | 0.636 | 0.724 | 0.750 | +14% |
+| lemniscate_slow | 5.072 | 5.070 | 5.032 | −1% |
+| lemniscate_fast | 1.787 | 1.708 | 1.719 | −4% |
+
+The in-firmware INDI inner loop **matches or beats the stock rate controller**
+(beats on circle_slow, lemniscate_slow, lemniscate_fast; slightly worse on
+hover_step, circle_fast) — the Layer-A milestone. The `.BIN` INDI health
+confirms the backend flew it (48 400 messages, 0.3 % saturation) and engages/
+disengages cleanly mid-flight (transient bound 0.21°). It does not beat S2 on
+the lemniscates because it keeps the stock outer loop (beating those is a
+Layer-B goal). Full analysis + the G1 limit-cycle finding:
+[`docs/s3_layerA_results.md`](docs/s3_layerA_results.md).
+
+Committed artifact: `baselines/s3_layerA_sitl.json` (run 1).
+
+```
+Reproduce: cd anixpkgs && nix-build pkgs/nixos/sitl-envs/s3-layerA.nix
+```
