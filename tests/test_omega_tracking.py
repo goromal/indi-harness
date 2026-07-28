@@ -15,15 +15,15 @@ def test_tracking_scores_low_nrmse():
 
 
 def test_divergence_scores_high_nrmse():
-    # Range-normalized NRMSE only crosses 0.5 for a genuinely diverging
-    # (e.g. anti-correlated) predictor, not merely an attenuated one -- a
-    # 0.1x-scaled prediction still tracks the shape and stays well under
-    # 0.5. Use a sign-inverted "prediction" as the strongly-diverging case.
+    # Layer A's failure mode: an attenuated predictor (pred ~ 0.1*meas). Under
+    # RMS-normalization this scores NRMSE ~ 0.9 -- correctly rejected by the
+    # gate. (Range-normalization would score it ~0.3 and let it slip through,
+    # which is exactly the metric bug this convention avoids.)
     t = np.linspace(0, 10, 2000)
     meas = np.stack([5*np.sin(t)]*3, axis=1)
-    pred = -meas
+    pred = 0.1 * meas
     s = omega_tracking_score(_health(pred, meas))
-    assert s[0]["nrmse"] > 0.5
+    assert all(s[ax]["nrmse"] > 0.5 for ax in range(3))
 
 
 def test_g1_ceiling():

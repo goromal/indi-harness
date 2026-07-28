@@ -33,14 +33,20 @@ def omega_tracking_score(health):
     """Per-axis predicted-vs-measured omega_dot tracking, from an INDI
     health dict (see sitl.binlog.read_indi_health: domega_pred, domega_meas,
     [n,3] rad/s^2). NRMSE is the enforced Layer-C exit-gate metric (< 0.3);
-    R^2 is reported alongside it."""
+    R^2 is reported alongside it.
+
+    NRMSE is normalized by RMS(meas), NOT the peak-to-peak range: the gate must
+    reject Layer A's attenuated predictor (pred ~ 0.2*meas -> NRMSE ~ 0.9) and
+    accept true tracking (pred ~ meas -> NRMSE ~ 0). Range-normalization would
+    score Layer A's failure mode at ~0.3 and let it slip through the gate."""
     pred = np.asarray(health["domega_pred"], float)
     meas = np.asarray(health["domega_meas"], float)
     out = {}
     for ax in range(3):
         m, p = meas[:, ax], pred[:, ax]
-        rng = m.max() - m.min()
-        nrmse = float(np.sqrt(np.mean((p - m) ** 2)) / rng) if rng > 1e-9 else float("inf")
+        rms_m = float(np.sqrt(np.mean(m ** 2)))
+        rmse = float(np.sqrt(np.mean((p - m) ** 2)))
+        nrmse = rmse / rms_m if rms_m > 1e-9 else float("inf")
         ss_res = float(np.sum((m - p) ** 2))
         ss_tot = float(np.sum((m - m.mean()) ** 2))
         r2 = 1.0 - ss_res / ss_tot if ss_tot > 1e-12 else 0.0
