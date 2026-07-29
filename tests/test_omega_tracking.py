@@ -1,5 +1,6 @@
 import numpy as np
-from indi_harness.sitl.align import omega_tracking_score, g1_ceiling_ok
+from indi_harness.sitl.align import (
+    omega_tracking_score, omega_gate_ok, g1_ceiling_ok)
 
 
 def _health(pred, meas):
@@ -24,6 +25,33 @@ def test_divergence_scores_high_nrmse():
     pred = 0.1 * meas
     s = omega_tracking_score(_health(pred, meas))
     assert all(s[ax]["nrmse"] > 0.5 for ax in range(3))
+
+
+def test_gate_skips_unexcited_axis():
+    # roll+pitch excited & tracking; yaw quiescent (measured omega_dot ~ 0) with a
+    # meaningless/huge NRMSE. The gate must PASS -- skipping the unexcited yaw --
+    # not fire a phantom failure on it (the circle_slow-yaw / step-roll artifact).
+    t = np.linspace(0, 10, 2000)
+    rng = np.random.default_rng(0)
+    excited = np.sin(t)                      # exc_rms ~ 0.7 >> floor
+    quiescent = 1e-3 * rng.standard_normal(t.shape)   # exc_rms ~ 0 << floor
+    meas = np.stack([excited, excited, quiescent], axis=1)
+    pred = np.stack([excited + 0.05*rng.standard_normal(t.shape),
+                     excited + 0.05*rng.standard_normal(t.shape),
+                     -quiescent], axis=1)    # yaw pred anti-correlated -> NRMSE huge
+    ok, per = omega_gate_ok(_health(pred, meas))
+    assert per[2]["excited"] is False and per[2]["nrmse"] > 1.0   # yaw: bad but skipped
+    assert per[0]["excited"] and per[1]["excited"]
+    assert ok                                # passes on the excited axes alone
+
+
+def test_gate_fails_when_excited_axis_untracked():
+    t = np.linspace(0, 10, 2000)
+    meas = np.stack([np.sin(t)]*3, axis=1)   # all excited
+    pred = 0.1 * meas                        # Layer-A attenuation -> NRMSE ~0.9
+    ok, per = omega_gate_ok(_health(pred, meas))
+    assert all(per[ax]["excited"] for ax in range(3))
+    assert not ok
 
 
 def test_g1_ceiling():
