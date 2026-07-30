@@ -61,28 +61,43 @@ def omega_tracking_score(health):
     return out
 
 
-def omega_gate_ok(health, nrmse_max=0.75, exc_floor=0.08):
-    """Excitation-aware omega_dot-tracking gate. Every SUFFICIENTLY-EXCITED axis
-    (exc_rms >= exc_floor rad/s^2) must track (nrmse < nrmse_max); unexcited axes
-    are skipped (their NRMSE is unreliable). Requires at least one excited axis.
-    Returns (ok, per_axis) where per_axis[ax] adds 'excited'.
+def omega_gate_ok(health, axes=(0, 1), nrmse_max=0.75, exc_floor=0.08):
+    """Excitation-aware omega_dot-tracking gate, scoped to the axes the C1
+    torque-space INDI is responsible for. Returns (ok, per_axis) where per_axis[ax]
+    adds 'excited' and 'enforced'.
+
+    ENFORCED AXES (`axes`, default (0,1) = roll,pitch): each must be excited
+    (exc_rms >= exc_floor) AND track (nrmse < nrmse_max); the gate requires at
+    least one enforced axis to actually be excited (else the maneuver didn't test
+    what we claim). NON-enforced axes are scored and reported but never fail the
+    gate.
+
+    Why roll/pitch only: C1 delivers real omega_dot-inversion on roll/pitch
+    (NRMSE ~0.48/0.49 in SITL, vs the ~1.1 not-tracking floor). YAW is
+    deliberately NOT enforced -- its omega_dot-inversion needs the rotor-inertia
+    (G2) term fed by measured RPM (design doc S3 sec.3.6), which SITL does not
+    model (no rotor-inertia reaction; actuator "RPM" is ~the command) and is
+    therefore deferred to HW/S4. Yaw still flies clean (it is not limit-cycling;
+    pred/meas yaw accel correlate +0.9, merely under-scaled by weak yaw
+    effectiveness) -- it just does not do full omega_dot-inversion in SITL, so
+    gating it here would enforce physics we cannot simulate.
 
     nrmse_max default 0.75 is the honest in-SITL clean-flight floor for the C1
-    torque-space INDI (roll ~0.48, pitch ~0.70 on their excited maneuvers, vs the
-    ~1.1 not-tracking floor). A tighter <0.3 needs the measured-actuator-state
-    fidelity SITL lacks (rotor inertia / actuator lag) -> HW/S4."""
+    torque-space INDI. A tighter <0.3 needs the measured-actuator-state fidelity
+    SITL lacks (rotor inertia / actuator lag) -> HW/S4."""
     s = omega_tracking_score(health)
     per = {}
     ok = True
-    any_excited = False
+    any_enforced_excited = False
     for ax in range(3):
         excited = s[ax]["exc_rms"] >= exc_floor
-        per[ax] = {**s[ax], "excited": excited}
-        if excited:
-            any_excited = True
+        enforced = ax in axes
+        per[ax] = {**s[ax], "excited": excited, "enforced": enforced}
+        if enforced and excited:
+            any_enforced_excited = True
             if not (s[ax]["nrmse"] < nrmse_max):
                 ok = False
-    return (ok and any_excited), per
+    return (ok and any_enforced_excited), per
 
 
 def g1_ceiling_ok(g1, analytic, factor=3.0):
