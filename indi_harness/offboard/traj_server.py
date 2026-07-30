@@ -118,3 +118,19 @@ def run_traj_server(server, rate_hz=50.0, spin=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
+
+def main():
+    import argparse
+    from ..sitl.baseline import BATTERY
+    ap = argparse.ArgumentParser(description="S3 Layer-B flat-setpoint server")
+    ap.add_argument("--case", default="circle_slow",
+                    help="battery case name to stream")
+    ap.add_argument("--rate-hz", type=float, default=50.0)
+    args = ap.parse_args()
+    case = next(c for c in BATTERY if c.name == args.case)
+    run_traj_server(TrajServer(case), rate_hz=args.rate_hz)
+
+
+if __name__ == "__main__":
+    main()

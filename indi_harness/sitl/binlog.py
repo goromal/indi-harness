@@ -49,3 +49,34 @@ def read_indi_health(path):
         "du": np.asarray(du, float),
         "sat": np.asarray(sat, int),
     }
+
+
+def read_outer_health(path):
+    """Return the Layer-B INDI outer-loop health time series from the INDB
+    dataflash message written by AC_CustomControl_INDI::update() (design doc L).
+    Keys map to arrays over time:
+        time_us                    [n]
+        ref_p              (m,NED) [n,3]  DDS flat-reference position
+        meas_p             (m,NED) [n,3]  measured (AHRS) position
+        t_cmd              (N)     [n]    outer-loop collective thrust command
+        fallback                   [n]    1 = stock outer loop ran this tick
+                                          (DDS ref disabled/stale/absent)
+    """
+    log = DFReader.DFReader_binary(str(path))
+    t, refp, measp, tc, fb = [], [], [], [], []
+    while True:
+        m = log.recv_match(type="INDB")
+        if m is None:
+            break
+        t.append(m.TimeUS)
+        refp.append([m.RPx, m.RPy, m.RPz])
+        measp.append([m.Px, m.Py, m.Pz])
+        tc.append(m.Tc)
+        fb.append(m.FB)
+    return {
+        "time_us": np.asarray(t, float),
+        "ref_p": np.asarray(refp, float),
+        "meas_p": np.asarray(measp, float),
+        "t_cmd": np.asarray(tc, float),
+        "fallback": np.asarray(fb, int),
+    }
