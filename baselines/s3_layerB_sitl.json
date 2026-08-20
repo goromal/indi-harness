@@ -1,0 +1,47 @@
+[
+ {
+  "case": "hover_step",
+  "rms_m": 0.592,
+  "max_m": 2.0013,
+  "active_frac": 0.758,
+  "n_active": 9001,
+  "n": 11881,
+  "source": "INDB"
+ },
+ {
+  "case": "circle_slow",
+  "rms_m": 0.4849,
+  "max_m": 0.7339,
+  "active_frac": 0.788,
+  "n_active": 10819,
+  "n": 13733,
+  "source": "INDB"
+ },
+ {
+  "case": "circle_fast",
+  "rms_m": 0.4599,
+  "max_m": 0.9859,
+  "active_frac": 0.707,
+  "n_active": 7412,
+  "n": 10484,
+  "source": "INDB"
+ },
+ {
+  "case": "lemniscate_slow",
+  "rms_m": 0.5095,
+  "max_m": 1.0375,
+  "active_frac": 0.793,
+  "n_active": 11002,
+  "n": 13880,
+  "source": "INDB"
+ },
+ {
+  "case": "lemniscate_fast",
+  "rms_m": 0.711,
+  "max_m": 1.3334,
+  "active_frac": 0.735,
+  "n_active": 7773,
+  "n": 10572,
+  "source": "INDB"
+ }
+]

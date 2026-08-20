@@ -104,3 +104,33 @@ def g1_ceiling_ok(g1, analytic, factor=3.0):
     """True if the fitted G1 stays within `factor`x the analytic seed --
     guards the Layer-C sysid regression against a runaway/unphysical fit."""
     return float(g1) < factor * float(analytic)
+
+
+def flat_tracking_score(health, active_only=True):
+    """Layer-B flat-tracking score from an outer-loop health dict (see
+    sitl.binlog.read_outer_health: ref_p, meas_p [n,3] NED, fallback [n]).
+
+    The INDB message logs the DDS flat reference vs the measured (AHRS)
+    position on the SAME tick, so tracking is a direct per-sample position
+    error -- no boot<->traj clock alignment needed (unlike evaluate_bin, which
+    scores stock GUIDED tracking off XKF1 on the trajectory clock).
+
+    Scores only the active samples (fallback == 0) by default -- the outer loop
+    only flies the reference while the DDS setpoint is fresh; the pre-engage and
+    post-hold ticks fall back to the stock loop (ref == meas == 0) and would
+    otherwise dilute the RMS. Returns {rms_m, max_m, active_frac, n_active, n}.
+    """
+    ref = np.asarray(health["ref_p"], float)
+    meas = np.asarray(health["meas_p"], float)
+    fb = np.asarray(health["fallback"], int)
+    n = len(fb)
+    mask = (fb == 0) if active_only else np.ones(n, bool)
+    err = np.linalg.norm(ref[mask] - meas[mask], axis=1) if mask.any() \
+        else np.array([0.0])
+    return {
+        "rms_m": float(np.sqrt(np.mean(err ** 2))),
+        "max_m": float(err.max()),
+        "active_frac": float(mask.mean()) if n else 0.0,
+        "n_active": int(mask.sum()),
+        "n": int(n),
+    }
