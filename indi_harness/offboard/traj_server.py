@@ -17,6 +17,9 @@ Design notes
 * Pure logic (TrajServer) is duck-typed and offline-testable; the rclpy shell
   at the bottom is imported lazily (host test envs have no rclpy).
 """
+import json
+import pathlib
+
 import numpy as np
 
 from ..trajectory import FlatOutput
@@ -28,13 +31,22 @@ class TrajServer:
     is set, produces FlatSetpoint field dicts (NED) at arbitrary trajectory
     time. Frame conversions and message construction live in the rclpy shell."""
 
-    def __init__(self, case):
+    def __init__(self, case=None):
         self.case = case
         self.origin = None
         self._t0 = None
 
     def set_origin(self, p_ned):
         self.origin = np.asarray(p_ned, float)
+
+    def set_case(self, case):
+        """Switch to a new trajectory case and re-latch the trajectory clock
+        (battery mode: the runner advances case-by-case, each engaged relative
+        to its own hover origin). No-op if the case is unchanged."""
+        if case is self.case:
+            return
+        self.case = case
+        self._t0 = None
 
     def elapsed(self, t_now):
         """Trajectory time from an absolute clock reading (latched on first
@@ -71,10 +83,30 @@ def build_msg(FlatSetpoint, fo, stamp):
     return msg
 
 
-def run_traj_server(server, rate_hz=50.0, spin=None):
+def read_ready(path):
+    """Parse a baseline_outer ready-file {case, origin} (NED origin), or return
+    None when it is absent/unreadable. In battery mode the runner writes this
+    per case (with the case's hover origin) and unlinks it between cases -- so
+    None naturally starves the DDS reference and the backend falls back to the
+    stock loop, exercising the DDS-staleness path between every case."""
+    try:
+        d = json.loads(pathlib.Path(path).read_text())
+        return d["case"], np.asarray(d["origin"], float)
+    except (FileNotFoundError, ValueError, KeyError):
+        return None
+
+
+def run_traj_server(server, rate_hz=50.0, spin=None, ready_file=None,
+                    battery=None):
     """rclpy shell. Publishes FlatSetpoint on /ap/flat_setpoint (DDS
-    rt/ap/flat_setpoint) at rate_hz, timed off /ap/clock, origin latched from
-    /ap/pose/filtered. Imported lazily -- host test envs have no rclpy."""
+    rt/ap/flat_setpoint) at rate_hz, timed off /ap/clock. Imported lazily --
+    host test envs have no rclpy.
+
+    Two origin modes:
+    * single-case (default): origin latched from the first /ap/pose/filtered.
+    * battery (ready_file + battery name->Case): origin + active case read from
+      the runner's ready-file each tick; when it is absent (between cases) no
+      setpoint is published, so the backend falls back to the stock loop."""
     import rclpy
     from rclpy.node import Node
     from rclpy.qos import qos_profile_sensor_data
@@ -98,13 +130,26 @@ def run_traj_server(server, rate_hz=50.0, spin=None):
             self.sim_time = msg.clock.sec + msg.clock.nanosec * 1e-9
 
         def _on_pose(self, msg):
-            if server.origin is None:
+            # Single-case mode latches the origin from the first pose; battery
+            # mode takes origin (and case) from the ready-file instead.
+            if battery is None and server.origin is None:
                 p = msg.pose.position
                 server.set_origin(enu_to_ned([p.x, p.y, p.z]))
 
         def _tick(self):
-            # Need both a clock and an origin before streaming setpoints.
-            if self.sim_time is None or server.origin is None:
+            if self.sim_time is None:
+                return
+            if battery is not None:
+                # Battery mode: follow the runner's ready-file. Absent => no
+                # setpoint this tick (backend falls back), which is the desired
+                # DDS-staleness behaviour between cases.
+                r = read_ready(ready_file)
+                if r is None:
+                    return
+                name, origin = r
+                server.set_case(battery[name])
+                server.set_origin(origin)
+            if server.origin is None or server.case is None:
                 return
             t = server.elapsed(self.sim_time)
             fo = server.sample(t)
@@ -125,11 +170,19 @@ def main():
     from ..sitl.baseline import BATTERY
     ap = argparse.ArgumentParser(description="S3 Layer-B flat-setpoint server")
     ap.add_argument("--case", default="circle_slow",
-                    help="battery case name to stream")
+                    help="battery case name to stream (single-case mode)")
     ap.add_argument("--rate-hz", type=float, default=50.0)
+    ap.add_argument("--ready-file", default=None,
+                    help="battery mode: follow this baseline_outer ready-file "
+                         "({case,origin}) case-by-case instead of a fixed --case")
     args = ap.parse_args()
-    case = next(c for c in BATTERY if c.name == args.case)
-    run_traj_server(TrajServer(case), rate_hz=args.rate_hz)
+    if args.ready_file:
+        battery = {c.name: c for c in BATTERY}
+        run_traj_server(TrajServer(), rate_hz=args.rate_hz,
+                        ready_file=args.ready_file, battery=battery)
+    else:
+        case = next(c for c in BATTERY if c.name == args.case)
+        run_traj_server(TrajServer(case), rate_hz=args.rate_hz)
 
 
 if __name__ == "__main__":
