@@ -27,13 +27,17 @@ def parse_servo(data):
 
 
 def format_state(st):
+    # ArduPilot SIM_JSON.cpp frames sensor messages on '\n' (it converts the
+    # newline to a nul terminator and only parses up to the last terminator).
+    # Without a trailing newline it never parses the reply and spins on
+    # "No JSON sensor message received, resending servos". Terminate every reply.
     return json.dumps({
         "timestamp": st["timestamp"],
         "imu": {"gyro": st["gyro"], "accel_body": st["accel_body"]},
         "position": st["position"],
         "velocity": st["velocity"],
         "quaternion": st["quaternion"],
-    })
+    }) + "\n"
 
 
 def pwm_to_omega(pwm4, omega_max):
@@ -53,7 +57,8 @@ class LockstepDriver:
         if pkt is None:
             return None
         if self._last_count is not None and pkt.frame_count < self._last_count:
-            self.model.__init__(self.model.P, drag_on=self.model.drag_on, dt=self.model.dt)
+            self.model.__init__(self.model.P, drag_on=self.model.drag_on,
+                                 dt=self.model.dt, ground=self.model.ground)
             self.model.seed_omega(self.model.P.hover_speed() * np.ones(4))
         self._last_count = pkt.frame_count
         self.model.dt = 1.0 / max(pkt.frame_rate, 1)

@@ -17,7 +17,9 @@ class Server:
     def __init__(self, port=9002, drag_on=True, drag=(0.35, 0.35, 0.15)):
         P = QuadParams()
         P.drag_D = np.diag(np.asarray(drag, float))
-        self.model = QuadJsonModel(P, drag_on=drag_on, dt=1.0 / 400.0)
+        # ground=True: the SITL vehicle must rest on a ground plane before it
+        # arms/takes off (a disarmed free-fall diverges the EKF -> SITL FPE).
+        self.model = QuadJsonModel(P, drag_on=drag_on, dt=1.0 / 400.0, ground=True)
         self.model.seed_omega(P.hover_speed() * np.ones(4))
         self.driver = LockstepDriver(self.model)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
