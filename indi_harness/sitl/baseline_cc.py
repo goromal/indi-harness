@@ -31,9 +31,35 @@ def _rc_override(conn, chan, value):
 
 
 def engage_custom_controller(conn, chan, value=2000, repeats=8, dt=0.2):
+    """Engage the custom controller via the RC aux switch (CUSTOM_CONTROLLER=109).
+
+    The aux function fires on a LOW->HIGH *transition*, not on a steady HIGH
+    level: driving the channel straight to HIGH when ArduPilot already reads it
+    HIGH (unconfigured override / prior state) latches no edge and the vehicle
+    keeps flying stock. So first hold the channel LOW to establish a known low
+    edge, then drive it HIGH -- guaranteeing the transition. Returns True if the
+    'Custom controller is ON' STATUSTEXT is observed, else False (the caller
+    should treat False as "engagement unconfirmed")."""
+    # Establish a known LOW so the subsequent HIGH is always a rising edge.
+    for _ in range(4):
+        _rc_override(conn, chan, 1000)
+        time.sleep(dt)
+    # Drain any stale STATUSTEXT so we only match the ON emitted by this edge.
+    while conn.recv_match(type="STATUSTEXT", blocking=False) is not None:
+        pass
+    engaged = False
     for _ in range(repeats):
         _rc_override(conn, chan, value)
-        time.sleep(dt)
+        t0 = time.time()
+        while time.time() - t0 < dt:
+            m = conn.recv_match(type="STATUSTEXT", blocking=False)
+            if m is not None and "custom controller is on" in m.text.lower():
+                engaged = True
+        if engaged:
+            break
+    print(f"engage_custom_controller: 'Custom controller is ON' seen={engaged}",
+          flush=True)
+    return engaged
 
 
 def _wait_gps_fix(conn, timeout=90.0):

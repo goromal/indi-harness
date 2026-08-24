@@ -51,6 +51,25 @@ def read_indi_health(path):
     }
 
 
+def read_imu_gyro(path, instance=0):
+    """Return (time_us, gyro_rad_s[n,3]) from the IMU dataflash message (GyrX/
+    GyrY/GyrZ, body rates rad/s) for one IMU instance. Unlike the RATE message
+    (which logs at ~10 Hz and aliases the rate-loop buzz into a near-constant
+    garbage value), IMU logs at ~50 Hz+ and is the trustworthy source for
+    detecting inner-loop limit-cycle buzz on roll/pitch."""
+    log = DFReader.DFReader_binary(str(path))
+    t, g = [], []
+    while True:
+        m = log.recv_match(type="IMU")
+        if m is None:
+            break
+        if getattr(m, "I", 0) != instance:
+            continue
+        t.append(m.TimeUS)
+        g.append([m.GyrX, m.GyrY, m.GyrZ])
+    return np.asarray(t, float), np.asarray(g, float)
+
+
 def read_outer_health(path):
     """Return the Layer-B INDI outer-loop health time series from the INDB
     dataflash message written by AC_CustomControl_INDI::update() (design doc L).

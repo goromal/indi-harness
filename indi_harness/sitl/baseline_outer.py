@@ -63,7 +63,12 @@ def run_battery_outer(url, out_dir, engage_rc=9, ready_file=None,
     s.takeoff(ALT_M)
     time.sleep(5.0)
     print(f"engaging custom controller via RC{engage_rc} (aux 109)", flush=True)
-    engage_custom_controller(c, engage_rc)
+    engaged = engage_custom_controller(c, engage_rc)
+    if not engaged:
+        # Not fatal to the run (STATUSTEXT can be missed under load); the .BIN du
+        # is the authoritative engagement check. Surface it loudly regardless.
+        print("WARNING: 'Custom controller is ON' STATUSTEXT not confirmed; "
+              "relying on .BIN du for engagement proof", flush=True)
     time.sleep(settle_s)
 
     flown = []
