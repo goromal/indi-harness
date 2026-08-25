@@ -144,6 +144,12 @@ def guided_move_ned(m, north, east, down, label="MOVE", dur=12.0):
             0, 0, 0, north, east, down, 0, 0, 0, 0, 0)
         time.sleep(0.1)
     end = get_local_pos(m)
+    if base is None or end is None:
+        # No fresh LOCAL_NED (buffer empty + recv timeout). Return NaNs so the
+        # caller's frame checks fail cleanly instead of raising on a None index.
+        print(f"[gate] {label}: missing LOCAL_NED (base={base} end={end})", flush=True)
+        nan = float("nan")
+        return (nan, nan, nan), (end if end is not None else (nan, nan, nan))
     d = (end[0] - base[0], end[1] - base[1], end[2] - base[2])
     print(f"[gate] {label} base={base} end={end} "
           f"delta=(dN={d[0]:.2f},dE={d[1]:.2f},dD={d[2]:.2f})", flush=True)

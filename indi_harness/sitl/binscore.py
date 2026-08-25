@@ -110,7 +110,7 @@ def omega_window(ih, t0, t1):
     time_us) is masked to the [t0, t1] window before scoring."""
     it = ih["time_us"]
     w = (it >= t0) & (it <= t1)
-    ihw = {k: (v[w] if getattr(v, "ndim", 1) else v) for k, v in ih.items()}
+    ihw = {k: (v[w] if isinstance(v, np.ndarray) and v.ndim else v) for k, v in ih.items()}
     om = omega_tracking_score(ihw)
     du = np.asarray(ihw["du"], float)
     sat = np.asarray(ihw["sat"], int)
