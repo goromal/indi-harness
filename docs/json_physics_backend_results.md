@@ -1,10 +1,10 @@
-# S4 Phase 1 — Aero-fidelity platform + INDI-under-actuator-lag finding
+# Aero-fidelity JSON physics backend — platform + INDI-under-actuator-lag finding
 
 **Status:** complete (2026-08-24). Phase 1 delivers a custom aero-fidelity SITL platform and a controller finding; the drag-rejection A/B demonstration is deferred to Phase 2 (see "Conclusion").
 
 ## Summary
 
-S4 set out to demonstrate INDI's drag-rejection advantage over stock PID on a physics model realistic enough to *have* drag — something benign SITL lacks. Phase 1 built that platform (a custom ArduPilot-SITL JSON physics backend on the `pysignals` rigid-body library) and validated it end-to-end. In the process it established a load-bearing finding: **the shipped in-firmware Layer-B INDI controller limit-cycles on the realistic backend because of first-order actuator lag the benign SITL never modeled.** Inner-loop retuning only partially helps. This is exactly the failure mode that measured-rotor-speed actuator feedback (Layer-C C2/C3) is designed to remove, and it quantitatively motivates Phase 2.
+This work set out to demonstrate INDI's drag-rejection advantage over stock PID on a physics model realistic enough to *have* drag — something benign SITL lacks. Phase 1 built that platform (a custom ArduPilot-SITL JSON physics backend on the `pysignals` rigid-body library) and validated it end-to-end. In the process it established a load-bearing finding: **the shipped in-firmware Layer-B INDI controller limit-cycles on the realistic backend because of first-order actuator lag the benign SITL never modeled.** Inner-loop retuning only partially helps. This is exactly the failure mode that measured-rotor-speed actuator feedback (Layer-C C2/C3) is designed to remove, and it quantitatively motivates Phase 2.
 
 ## The platform
 
@@ -45,7 +45,7 @@ Inner-loop retuning alone cannot make the shipped INDI a clean, *active* drop-in
 
 ## Conclusion — why the drag A/B is Phase 2
 
-Linear rotor drag is a translational disturbance; INDI rejects it through the outer-loop specific-force increment, which only works if the inner loop faithfully delivers the commanded torque. On the realistic backend the inner loop does not — it limit-cycles — so a drag-rejection A/B cannot be cleanly demonstrated in Phase 1. This is not a dead end; it is the S4 thesis made concrete:
+Linear rotor drag is a translational disturbance; INDI rejects it through the outer-loop specific-force increment, which only works if the inner loop faithfully delivers the commanded torque. On the realistic backend the inner loop does not — it limit-cycles — so a drag-rejection A/B cannot be cleanly demonstrated in Phase 1. This is not a dead end; it is the thesis made concrete:
 
 > The destabilizer is the **actuator-state side** of the INDI increment. Layer-A/B/C1 estimate actuator state from the *previous mixer command* with no lag model; benign SITL hid the cost because it has no real actuator lag. The realistic backend exposes it. **Layer-C C2/C3 — measured per-motor rotor speed feeding the increment, plus the G2 rotor-inertia term — is precisely the fix.**
 
