@@ -130,6 +130,9 @@ class QuadJsonModel:
             accel_body = np.array([0.0, 0.0, -self.P.g])
         else:
             accel_body = self._F_body / self.P.m
+        # True (lagged) actuator state, as a real bidi-DShot ESC would report --
+        # from self._omega, NOT the commanded omega (see model docstring / Task 2).
+        erpm = self.P.omega_to_erpm(self._omega)
         return {
             "timestamp": self.t,
             "position": pos.tolist(),
@@ -137,4 +140,5 @@ class QuadJsonModel:
             "quaternion": q.tolist(),
             "gyro": tw[3:].tolist(),
             "accel_body": accel_body.tolist(),
+            "erpm": np.asarray(erpm, float).tolist(),
         }
