@@ -99,3 +99,33 @@ def read_outer_health(path):
         "t_cmd": np.asarray(tc, float),
         "fallback": np.asarray(fb, int),
     }
+
+
+def read_indc_health(path):
+    """Return the Layer-C C2 measured-RPM health time series from the INDC
+    dataflash message written by AC_CustomControl_INDI::update() (design doc
+    L: the .BIN is source of truth). Keys map to arrays over time:
+        time_us              [n]
+        omega      (rad/s)   [n,4]  per-motor measured rotor speed
+        omega_dot  (rad/s^2) [n,4]  per-motor measured angular accel
+        u_act                [n,3]  reconstructed normalized actuator torque
+        fallback             [n]    1 = previous-command fallback this tick
+    """
+    log = DFReader.DFReader_binary(str(path))
+    t, om, od, ua, fb = [], [], [], [], []
+    while True:
+        m = log.recv_match(type="INDC")
+        if m is None:
+            break
+        t.append(m.TimeUS)
+        om.append([m.O0, m.O1, m.O2, m.O3])
+        od.append([m.D0, m.D1, m.D2, m.D3])
+        ua.append([m.Ux, m.Uy, m.Uz])
+        fb.append(m.FB)
+    return {
+        "time_us": np.asarray(t, float),
+        "omega": np.asarray(om, float),
+        "omega_dot": np.asarray(od, float),
+        "u_act": np.asarray(ua, float),
+        "fallback": np.asarray(fb, int),
+    }

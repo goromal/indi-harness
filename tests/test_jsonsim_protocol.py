@@ -47,6 +47,7 @@ def test_format_state_round_trip():
         "quaternion": [1.0, 0.0, 0.0, 0.0],
         "gyro": [0.01, 0.02, 0.03],
         "accel_body": [0.0, 0.0, -9.81],
+        "erpm": [100.0, 200.0, 300.0, 400.0],
     }
     s = format_state(st)
     decoded = json.loads(s)
@@ -56,13 +57,34 @@ def test_format_state_round_trip():
     assert decoded["position"] == st["position"]
     assert decoded["velocity"] == st["velocity"]
     assert decoded["quaternion"] == st["quaternion"]
+    assert decoded["rpm_1"] == st["erpm"][0]
+    assert decoded["rpm_2"] == st["erpm"][1]
+    assert decoded["rpm_3"] == st["erpm"][2]
+    assert decoded["rpm_4"] == st["erpm"][3]
     assert "imu" not in decoded or set(decoded.keys()) == {
         "timestamp",
         "imu",
         "position",
         "velocity",
         "quaternion",
+        "rpm_1",
+        "rpm_2",
+        "rpm_3",
+        "rpm_4",
     }
+
+
+def test_reply_carries_erpm():
+    m = QuadJsonModel(P, drag_on=False, dt=DT)
+    wh = P.hover_speed()
+    m.seed_omega(np.full(4, wh))
+    m.step_omega(np.full(4, wh))
+    reply = format_state(m.state())
+    assert reply.endswith("\n")
+    doc = json.loads(reply)
+    for k in ("rpm_1", "rpm_2", "rpm_3", "rpm_4"):
+        assert k in doc and doc[k] > 0
+    assert abs(doc["rpm_1"] - P.omega_to_erpm(wh)) < 1.0
 
 
 def test_lockstep_driver_steps_and_resets():
