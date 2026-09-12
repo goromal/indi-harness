@@ -1,5 +1,8 @@
 # indi-harness
 
+Current controller/simulator status and acceptance criteria:
+[September 12 audit and handoff](docs/2026-09-12-controller-audit.md).
+
 Quaternion INDI prototype and trajectory harness for ArduPilot. This package implements the S0/S1 deliverable of the ArduPilot INDI plan: an offline control-law prototype using quaternion-based attitude control with a trajectory harness for testing and validation.
 
 ## Conventions

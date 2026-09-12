@@ -1,4 +1,12 @@
-# S4 Phase 2 — Measured-RPM actuator feedback platform + the C2-structural-instability finding
+# S4 Phase 2 — Historical measured-RPM platform and failed-flight results
+
+**Audit correction (2026-09-12):** The measurements below describe the August
+experiments, but their structural-instability explanation is not established.
+A controlled old-firmware comparison now flies with correctly normalized yaw
+effectiveness and diverges when only that gain is restored to 1000. The legacy
+baseline is current stock PID, not the previous custom command; telemetry also
+had freshness/unit defects. Read the [current audit and handoff](2026-09-12-controller-audit.md)
+before using the historical conclusions below to plan C3.
 
 **Status:** complete (2026-08-28). Phase 2 delivers the measured-RPM platform extension + C2 firmware + a load-bearing controller finding; the full C3 rotor-speed² allocation is deferred to Phase 3 (see "Conclusion").
 

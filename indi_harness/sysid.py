@@ -58,6 +58,51 @@ def analytic_g2(params):
     return analytic_seed(params)["g2_yaw"]
 
 
+def normalized_effectiveness(params):
+    """G1/G2 in firmware's dimensionless mixer-command coordinates.
+
+    Valid for the linearized JSON actuator map: MOT_THST_EXPO=0,
+    MOT_SPIN_MIN=0, MOT_SPIN_MAX=1, voltage compensation off. ArduPilot's
+    normalise_rpy_factors() scales ALL three axes to +/-0.5, not +/-1.
+    For other thrust maps this is not the local command effectiveness;
+    identify that from telemetry at the actual operating point instead.
+    """
+    factors = 0.5 * np.array([[-1, 1, 1], [1, -1, 1],
+                              [1, 1, -1], [-1, -1, -1]], dtype=float)
+    torque_per_command = params.mixer()[1:] @ (params.Omega_max ** 2 * factors)
+    g1 = np.linalg.solve(params.J, torque_per_command)
+    return {"g1": np.diag(g1),
+            "g2_yaw": params.Ir / torque_per_command[2, 2],
+            "torque_per_command": torque_per_command,
+            "factors": factors}
+
+
+def identify_trace(time_s, rotor_omega, body_rate, omega_max=900.0):
+    """Fit normalized G1/G2 from a recorded JSON-SITL excitation.
+
+    No inertia, thrust constant, or rotor-inertia coefficient is supplied to
+    the regression. Inputs are timestamped measured state, not QuadSim calls.
+    G2 is returned in normalized yaw-command units, matching CC3_G2_YAW.
+    On the backend each new rotor sample drives that step's body acceleration.
+    """
+    t = np.asarray(time_s, float)
+    omega, rate = np.asarray(rotor_omega, float), np.asarray(body_rate, float)
+    dt = np.diff(t)
+    if len(dt) < 20 or np.any(dt <= 0):
+        raise ValueError("Need at least 21 strictly time-ordered samples")
+    factors = .5 * np.array([[-1,1,1], [1,-1,1], [1,1,-1], [-1,-1,-1]])
+    actuator = (omega[1:] ** 2 / omega_max ** 2) @ factors
+    rotor_accel = (np.diff(omega, axis=0) / dt[:, None]) @ np.array([1,1,-1,-1])
+    acceleration = np.diff(rate, axis=0) / dt[:, None]
+    design = np.column_stack([actuator, rotor_accel, np.ones(len(dt))])
+    coefficients, _, rank, _ = np.linalg.lstsq(design, acceleration, rcond=None)
+    if rank != 5:
+        raise ValueError("Insufficient independent excitation for G1/G2")
+    g1 = np.diag(coefficients[:3])
+    return {"g1": g1.tolist(), "g2_yaw": float(-coefficients[3, 2] / g1[2]),
+            "residual_rms": np.sqrt(np.mean((design @ coefficients - acceleration)**2, axis=0)).tolist()}
+
+
 # X-quad allocation patterns (+/-1 per rotor) that excite one torque axis to
 # first order while leaving the other two near zero, derived from
 # QuadParams.layout(): pos = [[a,a,0],[-a,-a,0],[a,-a,0],[-a,a,0]], d =

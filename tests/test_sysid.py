@@ -2,6 +2,7 @@ import numpy as np
 from indi_harness.params import QuadParams
 from indi_harness.sysid import (
     analytic_seed, analytic_g1, analytic_g2, identify_g1, identify_g2,
+    normalized_effectiveness,
 )
 
 
@@ -48,3 +49,17 @@ def test_sysid_recovers_g1_within_tol():
     true = analytic_g1(P)                # = 1/diag(J)
     print(f"g1: est={est} true={true}")
     assert np.all(np.abs(est - true) <= 0.15 * np.abs(true)), f"est={est} true={true}"
+
+
+def test_normalized_effectiveness_matches_motor_perturbations():
+    P = QuadParams()
+    seed = normalized_effectiveness(P)
+    hover = np.full(4, P.hover_speed() ** 2)
+    for axis in range(3):
+        delta = .01 * P.Omega_max ** 2 * seed["factors"][:, axis]
+        tau = (P.mixer() @ (hover + delta))[1:]
+        acceleration = np.linalg.solve(P.J, tau)
+        assert np.isclose(acceleration[axis] / .01, seed["g1"][axis])
+    assert np.allclose(seed["g1"], [343.65389566, 343.65389566, 28.8])
+    assert not np.allclose(seed["g1"], analytic_g1(P))
+    assert np.isclose(seed["g2_yaw"] * seed["torque_per_command"][2, 2], P.Ir)

@@ -141,4 +141,7 @@ class QuadJsonModel:
             "gyro": tw[3:].tolist(),
             "accel_body": accel_body.tolist(),
             "erpm": np.asarray(erpm, float).tolist(),
+            # AP_ESC_Telem receives mechanical RPM, after the ESC driver's
+            # pole conversion. Keep electrical RPM only as a model diagnostic.
+            "rpm": (self._omega * (60.0 / (2.0 * np.pi))).tolist(),
         }
