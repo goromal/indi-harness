@@ -1,6 +1,6 @@
 """Flat-output reference trajectories (NED world frame).
 
-YAML polynomial format (single source of truth — the S1 onboard-Lua and DDS
+YAML polynomial format (single source of truth — the stock-guided onboard-Lua and DDS
 trajectory-server evaluators must consume these same files):
 
     segments:

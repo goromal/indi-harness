@@ -37,6 +37,12 @@ def format_state(st):
         "position": st["position"],
         "velocity": st["velocity"],
         "quaternion": st["quaternion"],
+        # Per-motor mechanical RPM as top-level scalars (AP_ESC_Telem units).
+        # ArduPilot SIM_JSON keytable
+        # convention for indexed values, e.g. rng_1..rng_6 -- there's no
+        # 4-element vector data type). ArduPilot motor-layout order.
+        **{f"rpm_{i + 1}": rpm for i, rpm in enumerate(st["rpm"])
+           if rpm is not None},
     }) + "\n"
 
 

@@ -1,8 +1,8 @@
-"""S3 Layer-B battery: fly the trajectory battery with the in-firmware INDI
+"""flatness outer-loop controller battery: fly the trajectory battery with the in-firmware INDI
 outer loop (CC_TYPE=3, CC3_OUTER_EN=1) driven by the DDS FlatSetpoint reference
-from the ROS2 trajectory-server (design doc S3 Layer-B exit).
+from the ROS2 trajectory-server .
 
-Unlike Layer A/C (baseline_cc streams GUIDED position targets and the stock
+Unlike legacy INDI rate controller/C (baseline_cc streams GUIDED position targets and the stock
 outer loop tracks them), here the *outer loop itself* is in firmware: this
 runner only takes off, engages the custom controller (RC aux 109), and holds
 station in GUIDED while `traj_server` streams the flat reference over DDS -- the
@@ -18,8 +18,8 @@ trajectory origin is latched at the hover point.
 
 Usage (inside the drone VM):
     python3 -m indi_harness.sitl.baseline_outer \
-        --url tcp:127.0.0.1:5790 --out /tmp/s3_layerB --engage-rc 9 \
-        --ready-file /tmp/lb_ready --cases circle_slow
+        --url tcp:127.0.0.1:5790 --out /tmp/indi_flatness --engage-rc 9 \
+        --ready-file /tmp/trajectory_ready --cases circle_slow
 """
 import argparse
 import json
@@ -89,15 +89,15 @@ def run_battery_outer(url, out_dir, engage_rc=9, ready_file=None,
 
     ch = [65535] * 9
     c.mav.rc_channels_override_send(c.target_system, c.target_component, *ch)
-    (out / "s3_layerB_flown.json").write_text(json.dumps(flown, indent=1))
-    print(f"wrote {out / 's3_layerB_flown.json'}", flush=True)
+    (out / "indi_flatness_flown.json").write_text(json.dumps(flown, indent=1))
+    print(f"wrote {out / 'indi_flatness_flown.json'}", flush=True)
     return flown
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--url", default="tcp:127.0.0.1:5790")
-    ap.add_argument("--out", default="/tmp/s3_layerB")
+    ap.add_argument("--out", default="/tmp/indi_flatness")
     ap.add_argument("--engage-rc", type=int, default=9)
     ap.add_argument("--ready-file", default=None,
                     help="written with {case,origin} once hovering+engaged")

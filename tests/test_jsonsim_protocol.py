@@ -47,6 +47,7 @@ def test_format_state_round_trip():
         "quaternion": [1.0, 0.0, 0.0, 0.0],
         "gyro": [0.01, 0.02, 0.03],
         "accel_body": [0.0, 0.0, -9.81],
+        "rpm": [100.0, 200.0, 300.0, 400.0],
     }
     s = format_state(st)
     decoded = json.loads(s)
@@ -56,13 +57,43 @@ def test_format_state_round_trip():
     assert decoded["position"] == st["position"]
     assert decoded["velocity"] == st["velocity"]
     assert decoded["quaternion"] == st["quaternion"]
+    assert decoded["rpm_1"] == st["rpm"][0]
+    assert decoded["rpm_2"] == st["rpm"][1]
+    assert decoded["rpm_3"] == st["rpm"][2]
+    assert decoded["rpm_4"] == st["rpm"][3]
     assert "imu" not in decoded or set(decoded.keys()) == {
         "timestamp",
         "imu",
         "position",
         "velocity",
         "quaternion",
+        "rpm_1",
+        "rpm_2",
+        "rpm_3",
+        "rpm_4",
     }
+
+
+def test_reply_carries_mechanical_rpm_with_seven_pole_pairs():
+    m = QuadJsonModel(QuadParams(pole_pairs=7), drag_on=False, dt=DT)
+    wh = P.hover_speed()
+    m.seed_omega(np.full(4, wh))
+    m.step_omega(np.full(4, wh))
+    reply = format_state(m.state())
+    assert reply.endswith("\n")
+    doc = json.loads(reply)
+    for k in ("rpm_1", "rpm_2", "rpm_3", "rpm_4"):
+        assert k in doc and doc[k] > 0
+    assert abs(doc["rpm_1"] - P.omega_to_erpm(wh)) < 1.0
+    assert np.isclose(m.state()["erpm"][0], 7 * doc["rpm_1"])
+
+
+def test_missing_motor_rpm_field_is_omitted():
+    m = QuadJsonModel(P, drag_on=False, dt=DT)
+    state = m.state()
+    state["rpm"][1] = None
+    doc = json.loads(format_state(state))
+    assert "rpm_1" in doc and "rpm_2" not in doc and "rpm_3" in doc
 
 
 def test_lockstep_driver_steps_and_resets():

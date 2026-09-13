@@ -1,5 +1,4 @@
-"""rosbag2 reader (mcap or sqlite3) + latency stats (design doc §L: the bag
-records what the graph saw; this file turns it into evidence). Pure-python
+"""rosbag2 reader (mcap or sqlite3) + latency stats . Pure-python
 via `rosbags` — usable on host and in the VM, no ROS env required.
 
 Usage: python3 -m indi_harness.offboard.bags <bag_dir> [--json out.json]

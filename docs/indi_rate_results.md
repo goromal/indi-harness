@@ -1,25 +1,26 @@
-# S3 Layer-A results — in-firmware quaternion INDI attitude/rate backend
+# Legacy INDI attitude/rate controller: flight results
 
-Design-doc phase **S3, Layer A**: a `AC_CustomControl_INDI` backend in the
+Historical measurements for the `AC_CustomControl_INDI` backend in the
 `goromal/ardupilot` fork implementing the quaternion tilt-prioritized attitude
-error + INDI rate loop, selectable at runtime via `CC_TYPE=3`, flying the S1
-trajectory battery in SITL. Layer A replaces **only** the inner attitude/rate
+error + INDI rate loop, selectable at runtime via `CC_TYPE=3`, flying the stock-guided
+trajectory battery in SITL. legacy INDI rate controller replaces **only** the inner attitude/rate
 controller — the stock guided-mode position→attitude outer loop still runs, so
-the command path is identical to S1 (`SET_POSITION_TARGET_LOCAL_NED` GUIDED
-streaming). Output is torque-like to the stock mixer (§2 step 5 limitation
-accepted; real actuator/RPM feedback is Layer C).
+the command path is identical to stock-guided (`SET_POSITION_TARGET_LOCAL_NED` GUIDED
+streaming). Output uses normalized stock-mixer commands; these flights did not
+use measured RPM. See the [current audit](2026-09-12-controller-audit.md) for
+the subsequently added telemetry and measured-feedback behavior.
 
-Reproduce: `cd anixpkgs && nix-build pkgs/nixos/sitl-envs/s3-layerA.nix`
+Reproduce: `cd anixpkgs && nix-build pkgs/nixos/sitl-envs/indi-rate-backend.nix`
 (requires the fork + this repo threaded in — see `dependencies.nix`
 `drone-local-fork`, or the bumped flake.lock pins once pushed).
 
-## Tracking RMSE — S1 stock vs S2 offboard vs S3 INDI
+## Tracking RMSE — stock vs offboard vs onboard INDI
 
-Per-case EKF tracking RMSE (XKF1, sim-time normalized) flying the 5-case S1
-battery. S3 INDI is two independent fresh-VM runs; `compare_baselines.py`
+Per-case EKF tracking RMSE (XKF1, sim-time normalized) flying the 5-case stock-guided
+battery. onboard INDI is two independent fresh-VM runs; `compare_baselines.py`
 run1-vs-run2 exits 0 (repeatable within `max(0.15 m, 30%)`).
 
-| Case            | S1 stock | S2 offboard | **S3 INDI run 1** | **S3 INDI run 2** |
+| Case            | stock | offboard | **onboard INDI run 1** | **onboard INDI run 2** |
 |-----------------|---------:|------------:|------------------:|------------------:|
 | hover_step      |    0.615 |       0.540 |             0.756 |             0.754 |
 | circle_slow     |    0.271 |       0.757 |             0.252 |             0.252 |
@@ -27,24 +28,24 @@ run1-vs-run2 exits 0 (repeatable within `max(0.15 m, 30%)`).
 | lemniscate_slow |    5.072 |       0.462 |             5.070 |             5.032 |
 | lemniscate_fast |    1.787 |       0.769 |             1.708 |             1.719 |
 
-Committed artifact: `baselines/s3_layerA_sitl.json` (run 1).
+Committed artifact: `baselines/indi_rate_sitl.json` (run 1).
 
-## Verdict: S3 INDI **matches or beats** the stock baseline
+## Verdict: onboard INDI **matches or beats** the stock baseline
 
-Against the design-doc S3 exit ("beats or matches stock + S2"):
+Against the design-doc onboard exit ("beats or matches stock + offboard"):
 
-- **vs S1 stock — matches/beats.** S3 INDI beats stock on circle_slow
+- **vs stock — matches/beats.** onboard INDI beats stock on circle_slow
   (0.252 vs 0.271), lemniscate_slow (5.03–5.07 vs 5.072), and lemniscate_fast
   (1.71 vs 1.787); it is marginally worse on hover_step (0.75 vs 0.615) and
   circle_fast (0.72–0.75 vs 0.636). Net: the in-firmware INDI inner loop tracks
-  the battery about as well as the stock rate controller — the Layer-A milestone
+  the battery about as well as the stock rate controller — the legacy INDI rate controller milestone
   number.
-- **vs S2 offboard — does not beat on the lemniscates.** S2's flatness PD+ff
+- **vs offboard — does not beat on the lemniscates.** offboard's flatness PD+ff
   outer loop tracks the lemniscates far better (0.46 / 0.77 vs 5.03 / 1.71)
-  because S2 replaces the *outer* loop with a feedforward trajectory tracker;
-  Layer A keeps the stock outer loop and only improves the inner loop, so it
-  inherits the stock outer loop's lemniscate tracking. Beating S2 on the
-  lemniscates is a Layer-B (outer loop + flatness feedforward) goal.
+  because offboard replaces the *outer* loop with a feedforward trajectory tracker;
+  legacy INDI rate controller keeps the stock outer loop and only improves the inner loop, so it
+  inherits the stock outer loop's lemniscate tracking. Beating offboard on the
+  lemniscates is a flatness outer loop (outer loop + flatness feedforward) goal.
 
 ## INDI-health evidence (`.BIN`, design-doc §L)
 
@@ -73,11 +74,11 @@ Param flight config (firmware defaults): `CC3_FILT_HZ = 40`, `CC3_ATT_TLT_P = 6`
 limit cycle: at `G1 = 1.0` the loop saturates ~94 % of the time and the gyro
 shows ~180 rad/s² oscillation *while the attitude stays within ±3°* (it buzzes,
 it does not tip). Lowering `CC3_FILT_HZ` (40→8) makes it **worse** — added group
-delay, a phase/latency-driven instability of the same class as the S2 offboard
-finding (`docs/s2_latency_attribution.md`). Setting `G1` well above the true
+delay, a phase/latency-driven instability of the same class as the offboard
+finding (`docs/offboard_latency_attribution.md`). Setting `G1` well above the true
 effectiveness attenuates the increment (`Δu = (ω̇_cmd − ω̇_filt)/G1`) enough to
 fly stably. A cleaner angular-accel estimate (filter the gyro before
-differentiating) or Layer-C actuator/RPM feedback would allow a lower, more
+differentiating) or actuator feedback actuator/RPM feedback would allow a lower, more
 aggressive `G1` and true ω̇-tracking; deferred as a follow-on.
 
 ## Engage / disengage transient

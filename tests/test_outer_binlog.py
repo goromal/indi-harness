@@ -1,16 +1,16 @@
-"""Parse the Layer-B INDI outer-loop health message (INDB) from a fixture .BIN
+"""Parse the flatness outer loop INDI outer-loop health message (INDB) from a fixture .BIN
 captured from a CC3_OUTER_EN=1 attitude-only flight, and score flat-tracking
-(design doc L: the .BIN is source of truth)."""
+."""
 import pathlib
 import numpy as np
 import pytest
 from indi_harness.sitl.binlog import read_outer_health
 from indi_harness.sitl.align import flat_tracking_score
 
-FIXTURE = pathlib.Path(__file__).parent / "fixtures" / "indi_layerB.BIN"
+FIXTURE = pathlib.Path(__file__).parent / "fixtures" / "indi_outer_loop.BIN"
 
 
-@pytest.mark.skipif(not FIXTURE.exists(), reason="Layer-B fixture .BIN not present")
+@pytest.mark.skipif(not FIXTURE.exists(), reason="flatness outer loop fixture .BIN not present")
 def test_read_outer_health_shapes():
     h = read_outer_health(FIXTURE)
     n = len(h["time_us"])
@@ -33,7 +33,7 @@ def test_read_outer_health_shapes():
     assert set(np.unique(h["fallback"])).issubset({0, 1})
 
 
-@pytest.mark.skipif(not FIXTURE.exists(), reason="Layer-B fixture .BIN not present")
+@pytest.mark.skipif(not FIXTURE.exists(), reason="flatness outer loop fixture .BIN not present")
 def test_flat_tracking_score_active():
     h = read_outer_health(FIXTURE)
     s = flat_tracking_score(h)

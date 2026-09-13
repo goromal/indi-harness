@@ -3,7 +3,7 @@
 NED world, FRD body. State integrated by pysignals RigidBody6DOFModel; the
 quad-specific physics (rotor mixer, first-order motor lag, linear rotor drag)
 compose the body wrench u=[F;tau] fed to the integrator each step.
-Validated against the S0 numpy QuadSim (simmodel.py) in a later task.
+Validated against the offline numpy QuadSim (simmodel.py) in a later task.
 
 NOTE on the installed pysignals build: empirically (see tests/test_jsonsim_model.py
 history), RigidBody6DOFModel integrates v_dot = F/m - g_param, i.e. the g_param
@@ -34,6 +34,7 @@ class QuadJsonModel:
         self.P, self.drag_on, self.dt = params, drag_on, dt
         self.ground = ground
         self.M = params.mixer()
+        _, self._d = params.layout()
         self._omega = np.zeros(4)
         self._F_body = np.zeros(3)
         self._on_ground = ground  # starts resting on the ground plane
@@ -54,10 +55,16 @@ class QuadJsonModel:
     def _wrench(self, omega_cmd):
         P = self.P
         omega_cmd = np.clip(np.asarray(omega_cmd, float), 0.0, P.Omega_max)
-        self._omega += (omega_cmd - self._omega) * (self.dt / P.tau_m)
+        d_omega = (omega_cmd - self._omega) * (self.dt / P.tau_m)
+        self._omega += d_omega
         u = self.M @ (self._omega ** 2)
         F_body = np.array([0.0, 0.0, -u[0]])
         tau = u[1:].copy()
+        # Rotor-inertia yaw reaction: accelerating a CCW rotor (+d) torques
+        # body -z, matching QuadSim (simmodel.py). d_omega is the lagged
+        # increment applied to self._omega this step; d_omega/dt is the rate
+        # the oracle multiplies by P.Ir.
+        tau[2] -= P.Ir * float(self._d @ (d_omega / self.dt))
         if self.drag_on:
             v_body = np.asarray(self._m.x(self.t).twist).ravel()[:3]
             F_body = F_body - P.drag_D @ v_body
@@ -123,6 +130,9 @@ class QuadJsonModel:
             accel_body = np.array([0.0, 0.0, -self.P.g])
         else:
             accel_body = self._F_body / self.P.m
+        # True (lagged) actuator state, as a real bidi-DShot ESC would report --
+        # from self._omega, NOT the commanded omega (see model docstring / ).
+        erpm = self.P.omega_to_erpm(self._omega)
         return {
             "timestamp": self.t,
             "position": pos.tolist(),
@@ -130,4 +140,8 @@ class QuadJsonModel:
             "quaternion": q.tolist(),
             "gyro": tw[3:].tolist(),
             "accel_body": accel_body.tolist(),
+            "erpm": np.asarray(erpm, float).tolist(),
+            # AP_ESC_Telem receives mechanical RPM, after the ESC driver's
+            # pole conversion. Keep electrical RPM only as a model diagnostic.
+            "rpm": (self._omega * (60.0 / (2.0 * np.pi))).tolist(),
         }

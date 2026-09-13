@@ -1,4 +1,4 @@
-"""Layer B: cascaded linear INDI outer loop (Smeur 2018 structure).
+"""flatness outer loop: cascaded linear INDI outer loop (Smeur 2018 structure).
 
 Thrust-vector increment on filtered measured specific force:
     f_cmd = f_state_f + (a_cmd - a_meas_f)        [mass-normalized, world]

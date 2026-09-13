@@ -1,8 +1,8 @@
-"""S3 Layer-A battery: fly the S1 trajectory battery in GUIDED with the
+"""legacy INDI rate controller battery: fly the stock-guided trajectory battery in GUIDED with the
 in-firmware custom controller (CC_TYPE=INDI) engaged, scoring EKF tracking
-RMSE from the .BIN (design doc S3 Layer-A exit).
+RMSE from the .BIN .
 
-Identical command path to S1 (stock GUIDED position streaming) -- Layer A keeps
+Identical command path to stock-guided (stock GUIDED position streaming) -- legacy INDI rate controller keeps
 the stock outer loop and only swaps the inner attitude/rate controller. The
 custom controller is engaged mid-flight via the RC aux function (CUSTOM_
 CONTROLLER=109) on --engage-rc, which the SITL params wire to a channel.
@@ -10,7 +10,7 @@ CONTROLLER=109) on --engage-rc, which the SITL params wire to a channel.
 Usage (inside the drone VM or anywhere reaching the router):
     python3 -m indi_harness.sitl.baseline_cc \
         --url tcp:127.0.0.1:5790 --logs-dir /data/drone/ardusitl/logs \
-        --out /tmp/s3_layerA --engage-rc 9
+        --out /tmp/indi_rate --engage-rc 9
 """
 import argparse
 import json
@@ -106,8 +106,8 @@ def run_battery_cc(url, logs_dir, out_dir, engage_rc=9, cases=None):
     # release the override (leave the vehicle in a clean state)
     _rc_override(c, engage_rc, 65535)
     results = evaluate_flown(flown, logs_dir)
-    (out / "s3_layerA.json").write_text(results_json(results))
-    print(f"wrote {out / 's3_layerA.json'}", flush=True)
+    (out / "indi_rate.json").write_text(results_json(results))
+    print(f"wrote {out / 'indi_rate.json'}", flush=True)
     return results
 
 
@@ -115,7 +115,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--url", default="tcp:127.0.0.1:5790")
     ap.add_argument("--logs-dir", default="/data/drone/ardusitl/logs")
-    ap.add_argument("--out", default="/tmp/s3_layerA")
+    ap.add_argument("--out", default="/tmp/indi_rate")
     ap.add_argument("--engage-rc", type=int, default=9,
                     help="RC channel wired to CUSTOM_CONTROLLER aux (option 109)")
     args = ap.parse_args()

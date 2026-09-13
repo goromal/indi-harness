@@ -1,4 +1,4 @@
-"""S1 repeatability check: two baseline JSONs must agree per case within
+"""stock-guided repeatability check: two baseline JSONs must agree per case within
 max(0.15 m, 30%). Exit 0 = repeatable."""
 import json
 import sys

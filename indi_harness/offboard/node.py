@@ -1,5 +1,5 @@
-"""S2 offboard node: event-driven on /ap/pose/filtered, commands
-SET_ATTITUDE_TARGET on the mavlink-router link (design doc T.1 route).
+"""offboard node: event-driven on /ap/pose/filtered, commands
+SET_ATTITUDE_TARGET on the mavlink-router link .
 
 OffboardMission is pure logic (duck-typed messages + conn) so the whole
 control path is offline-testable; the rclpy shell at the bottom only wires
@@ -81,7 +81,7 @@ class OffboardMission:
 
 class _Shifted:
     """Relative-displacement wrapper: ref(t).p = origin + (p(t) - p(0)) —
-    the same convention the S1 streamer applied, so align/evaluate_bin's
+    the same convention the stock-guided streamer applied, so align/evaluate_bin's
     origin_offset math is reused unchanged."""
 
     def __init__(self, traj, origin):

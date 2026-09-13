@@ -1,5 +1,4 @@
-"""ArduPilot .BIN dataflash adapter (design doc L.1: BIN is the on-vehicle
-source of truth; this reads the EKF position solution, XKF1.PN/PE/PD)."""
+"""ArduPilot .BIN dataflash adapter ."""
 import numpy as np
 from pymavlink import DFReader
 
@@ -20,9 +19,8 @@ def read_ekf_pos(path, core=0):
 
 
 def read_indi_health(path):
-    """Return the Layer-A INDI health time series from the INDI dataflash
-    message written by AC_CustomControl_INDI::update() (design doc L: the .BIN
-    is source of truth). Keys map to arrays over time:
+    """Return the INDI health time series from the INDI dataflash
+    message written by AC_CustomControl_INDI::update() . Keys map to arrays over time:
         time_us                              [n]
         domega_pred, domega_meas   (rad/s^2) [n,3]  predicted vs filtered accel
         u_act                                [n,3]  filtered actuator-state est
@@ -71,8 +69,8 @@ def read_imu_gyro(path, instance=0):
 
 
 def read_outer_health(path):
-    """Return the Layer-B INDI outer-loop health time series from the INDB
-    dataflash message written by AC_CustomControl_INDI::update() (design doc L).
+    """Return the flatness outer loop INDI outer-loop health time series from the INDB
+    dataflash message written by AC_CustomControl_INDI::update() .
     Keys map to arrays over time:
         time_us                    [n]
         ref_p              (m,NED) [n,3]  DDS flat-reference position
@@ -97,5 +95,34 @@ def read_outer_health(path):
         "ref_p": np.asarray(refp, float),
         "meas_p": np.asarray(measp, float),
         "t_cmd": np.asarray(tc, float),
+        "fallback": np.asarray(fb, int),
+    }
+
+
+def read_indc_health(path):
+    """Return the measured-RPM feedback measured-RPM health time series from the INDC
+    dataflash message written by AC_CustomControl_INDI::update() . Keys map to arrays over time:
+        time_us              [n]
+        omega      (rad/s)   [n,4]  per-motor measured rotor speed
+        omega_dot  (rad/s^2) [n,4]  per-motor measured angular accel
+        u_act                [n,3]  reconstructed normalized actuator torque
+        fallback             [n]    1 = previous-command fallback this tick
+    """
+    log = DFReader.DFReader_binary(str(path))
+    t, om, od, ua, fb = [], [], [], [], []
+    while True:
+        m = log.recv_match(type="INDC")
+        if m is None:
+            break
+        t.append(m.TimeUS)
+        om.append([m.O0, m.O1, m.O2, m.O3])
+        od.append([m.D0, m.D1, m.D2, m.D3])
+        ua.append([m.Ux, m.Uy, m.Uz])
+        fb.append(m.FB)
+    return {
+        "time_us": np.asarray(t, float),
+        "omega": np.asarray(om, float),
+        "omega_dot": np.asarray(od, float),
+        "u_act": np.asarray(ua, float),
         "fallback": np.asarray(fb, int),
     }

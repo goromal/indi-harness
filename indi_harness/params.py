@@ -23,6 +23,7 @@ class QuadParams:
     Omega_min: float = 100.0  # rad/s
     Omega_max: float = 900.0
     drag_D: np.ndarray = None  # rotor-drag coeffs, body frame [N/(m/s)]
+    pole_pairs: float = 1.0   # bidi-DShot eRPM = mechanical_rpm * pole_pairs
 
     def __post_init__(self):
         if self.J is None:
@@ -32,6 +33,10 @@ class QuadParams:
 
     def hover_speed(self):
         return np.sqrt(self.m * self.g / (4.0 * self.kf))
+
+    def omega_to_erpm(self, omega):
+        """rad/s -> electrical RPM (as a real ESC's bidi-DShot frame reports)."""
+        return np.asarray(omega, float) * (60.0 / (2.0 * np.pi)) * self.pole_pairs
 
     # Motor layout: X config, FRD body, order [FR, BL, FL, BR] (ArduPilot X).
     # d = +1: CCW prop (viewed from above) -> +yaw reaction in NED.
@@ -53,7 +58,7 @@ class QuadParams:
         return M
 
     def perturbed(self, kf_scale=1.0, km_scale=1.0, tau_scale=1.0):
-        """Controller-side model error injection (S5-style robustness tests)."""
+        """Controller-side model error injection (robustness-style robustness tests)."""
         return replace(self, kf=self.kf * kf_scale, km=self.km * km_scale,
                        tau_m=self.tau_m * tau_scale, J=self.J.copy(),
                        drag_D=self.drag_D.copy())

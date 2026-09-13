@@ -1,4 +1,4 @@
-"""Human-facing S0 summary: RMSE table + tracking plots -> out/."""
+"""Human-facing offline summary: RMSE table + tracking plots -> out/."""
 import pathlib
 import numpy as np
 import matplotlib

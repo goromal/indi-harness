@@ -1,4 +1,4 @@
-"""Pure-logic tests for the Layer-B trajectory server (no rclpy): origin
+"""Pure-logic tests for the flatness outer loop trajectory server (no rclpy): origin
 shifting, trajectory-clock latching, battery case-switching, and the
 ready-file protocol that drives battery mode / the DDS-staleness fallback."""
 import json
@@ -49,7 +49,7 @@ def test_set_case_noop_when_same():
 
 
 def test_read_ready_roundtrip_and_missing(tmp_path):
-    p = tmp_path / "lb_ready"
+    p = tmp_path / "trajectory_ready"
     assert read_ready(p) is None          # absent -> None (fallback)
     p.write_text(json.dumps({"case": "lemniscate_fast",
                              "origin": [1.0, 2.0, -9.7]}))
@@ -66,7 +66,7 @@ def test_read_ready_roundtrip_and_missing(tmp_path):
 def test_battery_switching_via_ready_file(tmp_path):
     """Simulate the battery-mode tick: follow the ready-file case-by-case,
     re-latching origin + clock on each switch, falling back when absent."""
-    p = tmp_path / "lb_ready"
+    p = tmp_path / "trajectory_ready"
     s = TrajServer()
 
     def tick(sim_time):

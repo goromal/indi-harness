@@ -1,4 +1,4 @@
-"""S3 Layer-B trajectory server: publish ardupilot_msgs/FlatSetpoint over the
+"""flatness outer-loop controller trajectory server: publish ardupilot_msgs/FlatSetpoint over the
 custom AP_DDS topic (rt/ap/flat_setpoint) so the in-firmware INDI outer loop
 (AC_CustomControl_INDI, CC_TYPE=3, CC3_OUTER_EN=1) can fly a minimum-snap /
 analytic flat-output reference.
@@ -8,12 +8,11 @@ Design notes
 * The message carries the full flat reference {p,v,a,j,s, yaw,yaw_rate,
   yaw_accel} in the **NED world frame** -- the firmware FlatRef cache consumes
   the fields verbatim (no ENU->NED flip on the wire; the trajectory-server owns
-  the frame). This mirrors the AP_DDS FlatSetpoint IDL added in Task B3.
+  the frame). This mirrors the AP_DDS FlatSetpoint IDL added in .
 * Trajectory time comes from the SITL clock (/ap/clock), never wall clock, so
-  sim-time slowdown does not skew the feedforward phasing (design doc T timing
-  note). The origin is captured from the first /ap/pose/filtered so the
+  sim-time slowdown does not skew the feedforward phasing . The origin is captured from the first /ap/pose/filtered so the
   trajectory is engaged relative to the vehicle's position (the _Shifted
-  convention reused from the S2 offboard node).
+  convention reused from the offboard node).
 * Pure logic (TrajServer) is duck-typed and offline-testable; the rclpy shell
   at the bottom is imported lazily (host test envs have no rclpy).
 """
@@ -168,7 +167,7 @@ def run_traj_server(server, rate_hz=50.0, spin=None, ready_file=None,
 def main():
     import argparse
     from ..sitl.baseline import BATTERY
-    ap = argparse.ArgumentParser(description="S3 Layer-B flat-setpoint server")
+    ap = argparse.ArgumentParser(description="flatness outer-loop controller flat-setpoint server")
     ap.add_argument("--case", default="circle_slow",
                     help="battery case name to stream (single-case mode)")
     ap.add_argument("--rate-hz", type=float, default=50.0)

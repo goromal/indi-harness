@@ -1,10 +1,10 @@
-"""S1 baseline battery: fly canned trajectories in GUIDED against SITL and
-score EKF tracking RMSE from the .BIN dataflash (design doc S1 exit).
+"""stock-guided baseline battery: fly canned trajectories in GUIDED against SITL and
+score EKF tracking RMSE from the .BIN dataflash .
 
 Usage (from inside the drone VM, or anywhere that reaches the router):
     python3 -m indi_harness.sitl.baseline \
         --url tcp:127.0.0.1:5790 --logs-dir /data/drone/ardusitl/logs \
-        --out /tmp/s1_baseline
+        --out /tmp/stock_guided
 """
 import argparse
 import json
@@ -65,7 +65,7 @@ def newest_bin(logs_dir):
 
 def evaluate_flown(flown, logs_dir):
     """flown: list of (case, origin, FlightRecord). Scores each case's window
-    of the newest .BIN with the S1 evaluator; returns the results list."""
+    of the newest .BIN with the stock-guided evaluator; returns the results list."""
     bin_path = newest_bin(logs_dir)
     print(f"evaluating against {bin_path}", flush=True)
     time_us, p_ned = read_ekf_pos(bin_path)
@@ -108,8 +108,8 @@ def run_battery(url, logs_dir, out_dir, cases=None):
         time.sleep(3.0)  # let it settle between cases
 
     results = evaluate_flown(flown, logs_dir)
-    (out / "s1_baseline.json").write_text(results_json(results))
-    print(f"wrote {out / 's1_baseline.json'}", flush=True)
+    (out / "stock_guided.json").write_text(results_json(results))
+    print(f"wrote {out / 'stock_guided.json'}", flush=True)
     return results
 
 
@@ -117,7 +117,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--url", default="tcp:127.0.0.1:5790")
     ap.add_argument("--logs-dir", default="/data/drone/ardusitl/logs")
-    ap.add_argument("--out", default="/tmp/s1_baseline")
+    ap.add_argument("--out", default="/tmp/stock_guided")
     args = ap.parse_args()
     run_battery(args.url, args.logs_dir, args.out)
 

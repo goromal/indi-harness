@@ -32,7 +32,7 @@ def attitude_rate_ref(q, q_ref, kp_tilt, kp_yaw, w_ff):
     body-to-world quaternions; w_ff is the reference body rate.
 
     Note: adding w_ff directly assumes small attitude error (exact form
-    would rotate it through qe). Fine for S0.
+    would rotate it through qe). Fine for offline.
     """
     qe = quat.qerr(q, q_ref)
     q_red, q_yaw = tilt_yaw_decompose(qe)

@@ -1,4 +1,4 @@
-"""Boot-clock <-> trajectory-clock alignment (design doc L.3).
+"""Boot-clock <-> trajectory-clock alignment .
 
 The FlightRecord's (traj_t, boot_ms) pairs define a linear map that absorbs
 both the boot-time offset and any SITL sim-time slowdown; .BIN TimeUS data
@@ -35,9 +35,9 @@ def omega_tracking_score(health):
     [n,3] rad/s^2). Returns per axis {nrmse, r2, exc_rms}.
 
     NRMSE is normalized by RMS(meas), NOT the peak-to-peak range: the gate must
-    reject Layer A's attenuated predictor (pred ~ 0.2*meas -> NRMSE ~ 0.9) and
+    reject legacy INDI rate controller's attenuated predictor (pred ~ 0.2*meas -> NRMSE ~ 0.9) and
     accept true tracking (pred ~ meas -> NRMSE ~ 0). Range-normalization would
-    score Layer A's failure mode at ~0.3 and let it slip through the gate.
+    score legacy INDI rate controller's failure mode at ~0.3 and let it slip through the gate.
 
     exc_rms = RMS(measured omega_dot) is the per-axis EXCITATION level. NRMSE
     is only meaningful where exc_rms is substantial: on a near-quiescent axis
@@ -62,7 +62,7 @@ def omega_tracking_score(health):
 
 
 def omega_gate_ok(health, axes=(0, 1), nrmse_max=0.75, exc_floor=0.08):
-    """Excitation-aware omega_dot-tracking gate, scoped to the axes the C1
+    """Excitation-aware omega_dot-tracking gate, scoped to the axes the angular-acceleration feedback
     torque-space INDI is responsible for. Returns (ok, per_axis) where per_axis[ax]
     adds 'excited' and 'enforced'.
 
@@ -72,19 +72,19 @@ def omega_gate_ok(health, axes=(0, 1), nrmse_max=0.75, exc_floor=0.08):
     what we claim). NON-enforced axes are scored and reported but never fail the
     gate.
 
-    Why roll/pitch only: C1 delivers real omega_dot-inversion on roll/pitch
+    Why roll/pitch only: angular-acceleration feedback delivers real omega_dot-inversion on roll/pitch
     (NRMSE ~0.48/0.49 in SITL, vs the ~1.1 not-tracking floor). YAW is
     deliberately NOT enforced -- its omega_dot-inversion needs the rotor-inertia
-    (G2) term fed by measured RPM (design doc S3 sec.3.6), which SITL does not
+    (G2) term fed by measured RPM , which SITL does not
     model (no rotor-inertia reaction; actuator "RPM" is ~the command) and is
-    therefore deferred to HW/S4. Yaw still flies clean (it is not limit-cycling;
+    therefore deferred to HW/realistic-physics. Yaw still flies clean (it is not limit-cycling;
     pred/meas yaw accel correlate +0.9, merely under-scaled by weak yaw
     effectiveness) -- it just does not do full omega_dot-inversion in SITL, so
     gating it here would enforce physics we cannot simulate.
 
-    nrmse_max default 0.75 is the honest in-SITL clean-flight floor for the C1
+    nrmse_max default 0.75 is the honest in-SITL clean-flight floor for the angular-acceleration feedback
     torque-space INDI. A tighter <0.3 needs the measured-actuator-state fidelity
-    SITL lacks (rotor inertia / actuator lag) -> HW/S4."""
+    SITL lacks (rotor inertia / actuator lag) -> HW/realistic-physics."""
     s = omega_tracking_score(health)
     per = {}
     ok = True
@@ -102,12 +102,12 @@ def omega_gate_ok(health, axes=(0, 1), nrmse_max=0.75, exc_floor=0.08):
 
 def g1_ceiling_ok(g1, analytic, factor=3.0):
     """True if the fitted G1 stays within `factor`x the analytic seed --
-    guards the Layer-C sysid regression against a runaway/unphysical fit."""
+    guards the actuator feedback sysid regression against a runaway/unphysical fit."""
     return float(g1) < factor * float(analytic)
 
 
 def flat_tracking_score(health, active_only=True):
-    """Layer-B flat-tracking score from an outer-loop health dict (see
+    """flatness outer loop flat-tracking score from an outer-loop health dict (see
     sitl.binlog.read_outer_health: ref_p, meas_p [n,3] NED, fallback [n]).
 
     The INDB message logs the DDS flat reference vs the measured (AHRS)
