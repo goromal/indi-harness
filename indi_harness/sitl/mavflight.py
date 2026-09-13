@@ -81,6 +81,26 @@ def disarm(m, force=False):
                             0, 21196 if force else 0, 0, 0, 0, 0, 0)
 
 
+def disarm_with_retry(m, timeout=10.0, retry_s=0.2, force=False):
+    """Send disarm until a HEARTBEAT confirms the vehicle is disarmed.
+
+    This is required when a short-lived diagnostic process hands the same SITL
+    instance to another runner: exiting immediately after one unacknowledged
+    command can leave the next runner racing an armed vehicle.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        disarm(m, force=force)
+        heartbeat = m.recv_match(type="HEARTBEAT", blocking=True,
+                                 timeout=min(1.0, retry_s))
+        if heartbeat is not None and not (
+                heartbeat.base_mode
+                & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED):
+            return True
+        time.sleep(retry_s)
+    return False
+
+
 def get_local_pos(m, timeout=3.0):
     """Return the FRESHEST LOCAL_POSITION_NED as (x, y, z), or None.
 
