@@ -14,17 +14,11 @@ def analytic_seed(params):
     See indi_harness.params.QuadParams (mixer(), layout(), J, kf, km, arm, Ir,
     hover_speed(), Omega_min/max).
 
-    g1_torque is the *torque-space* effectiveness the Layer-A fallback path
-    uses (design-doc: 'map Delta-omega_dot -> Delta-tau via diagonal G1
-    (torque-space)', i.e. Delta-tau = Delta-omega_dot / G1). Since the rigid
-    body EOM is omega_dot = J^-1 @ tau, that ratio is exactly J^-1 -- it does
-    NOT depend on kf/km/arm, which only govern the *actuator* allocation
-    (M/Minv, below) that later converts a torque request into per-rotor
-    Omega^2 commands for the Layer-C RPM path. Numerically 1/J = [200, 200,
-    111] rad/s^2 per N*m for the default SITL quad, matching the design
-    doc's cited true-effectiveness ballpark (~175-479 rad/s^2/unit) for
-    roll/pitch; yaw is a bit lower (weaker yaw authority: J_yaw > J_roll)
-    but still comfortably inside the loose acceptance band.
+    g1_torque is physical torque effectiveness: omega_dot = J^-1 @ tau.
+    It does NOT depend on kf/km/arm, which govern the actuator allocation
+    (M/Minv). Numerically 1/J = [200, 200, 111] rad/s^2 per N*m for the
+    default quad. These are oracle torque units, NOT firmware CC3_G1 mixer
+    command units; use normalized_effectiveness for the linearized JSON map.
     """
     P = params
     M = P.mixer()

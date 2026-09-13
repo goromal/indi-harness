@@ -65,13 +65,52 @@ Artifacts are under the workspace `data/`: `probe-old-linear-04`,
 `probe-old-yaw1000`, `probe-corrected-01`; earlier numbered attempts retain
 startup/arming diagnostics. Do not commit the large flight logs into source.
 
+The remote-pinned Nix package also passes: 136 Python tests, 25 non-empty
+firmware math tests, and the same four-phase flight on DDS-enabled firmware.
+Packaged flight artifact: `data/indi-packaged-probe` (a Nix store result).
+Step NRMSE is 0.815/0.818, saturation is zero, peak rate 0.614 rad/s;
+fallback is 100% in the trimmed dropout window and 0% in all other windows.
+The CI flight job now includes this small regression. Reproduce from anixpkgs:
+
+```sh
+nix-build pkgs/nixos/sitl-envs/indi-actuator-probe.nix -A flight
+```
+
+This expression always uses the checkout's lock pins. The larger VM expression
+still needs temporary `dependencies.nix local-build=true`; restore it to false
+before committing. Both firmware and harness are on `dev/indi-s4-phase2`.
+
+## Corrected DDS trajectory attempt
+
+The VM battery was also run with the corrected linear map and logged gains
+`[500, 500, 28.8]`; RPM fallback was 0%, and the normalized gain check passed.
+The trajectory gate nevertheless failed: heavy saturation, five active blocks
+for two cases, and an EKF-reported peak altitude of 1344 m. Do not interpret its
+per-case RMS as valid comparisons: the engaged blocks no longer map one-to-one
+to the cases and the estimator was failing.
+
+Crucially, this is not a clean C2-onset test. At t=69.53 s, BEFORE custom control
+engaged at t=70.83 s, stock RATE already logged roll 238 deg/s. At the first
+INDU tick the gyro was `[2.78, 3.64, -1.36]` rad/s. The first active DDS outer
+sample was later, at t=76.43 s, after the EKF failsafe. Thus neither C2 nor DDS
+caused the onset of this run's instability. The scorer now explicitly rejects
+an unsettled pre-engagement handover (>1 rad/s roll/pitch norm in the preceding
+two seconds). This is an additional validity check, not a relaxed acceptance
+threshold.
+
+Artifacts: `data/indi-c2-corrected-vm/{flight.BIN,indi_score.json}`,
+`data/indi-c2-first-divergence.log`, `data/indi-c2-engagement.log`.
+Next isolate the stock GUIDED hold/takeoff on the linearized map, then verify a
+settled handover before enabling DDS. The small probe uses a shorter takeoff
+settle and attitude targets; it does not validate that longer position hold.
+
 ## Outstanding acceptance criteria
 
-1. Validate the packaged firmware/harness and repeat the small-flight gate.
-2. Test C2 with correct units on the DDS-driven trajectory battery; retain the
+1. Establish a stable stock GUIDED hold and handover on the linear map, then
+   repeat the DDS-driven trajectory battery; retain the
    stock collective controller until its separate thrust-state problem is solved.
-3. Only after clean trajectory flight, run PID/INDI x drag-off/drag-on comparisons.
-4. C3 is a candidate for allocation, saturation and RPM-loop benefits; it is not
+2. Only after clean trajectory flight, run PID/INDI x drag-off/drag-on comparisons.
+3. C3 is a candidate for allocation, saturation and RPM-loop benefits; it is not
    an established prerequisite from the August failure. Decide its scope from
    these controlled results. S5 robustness and hardware validation remain open.
 
