@@ -1,10 +1,9 @@
-"""Guided-mode MAVLink trajectory streamer (design doc T.1 — deliberately thin,
-no abstraction layer). Talks to mavlink-router's GCS TCP port (default 5790).
+"""Guided-mode MAVLink trajectory streamer . Talks to mavlink-router's GCS TCP port (default 5790).
 
 The FlightRecord's (traj_t, boot_ms) pairs are the ONLY bridge between the
 trajectory clock and ArduPilot's boot clock — align.py fits the linear map
 that lets .BIN TimeUS data be scored on the trajectory timeline even when
-SITL runs off wall-clock speed (design doc: sim-time-normalized, always).
+SITL runs off wall-clock speed .
 """
 import time
 from dataclasses import dataclass, field

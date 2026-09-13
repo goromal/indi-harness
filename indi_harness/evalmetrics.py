@@ -1,4 +1,4 @@
-"""Tracking metrics. Reused verbatim by the S1 harness evaluator — keep free
+"""Tracking metrics. Reused verbatim by the stock-guided harness evaluator — keep free
 of sim-specific assumptions (takes plain arrays)."""
 import numpy as np
 

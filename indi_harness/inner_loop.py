@@ -1,4 +1,4 @@
-"""Layer A(+C) inner loop: quaternion tilt-prioritized attitude + INDI rate
+"""legacy INDI rate controller(+C) inner loop: quaternion tilt-prioritized attitude + INDI rate
 loop on rotor-speed-squared increments.
 
 Phase-matching rule enforced structurally: the angular-accel filter and the

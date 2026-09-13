@@ -2,7 +2,7 @@
 
 ## Established results
 
-The S4 Phase-2 platform is useful, but the August conclusion that measured
+The measured-RPM feedback platform is useful, but the August conclusion that measured
 torque-space feedback is inherently unstable was too strong. The old firmware
 (`7ee4de5`, binary SHA256 `f3b2630fc8c3f86769bb97011d998cfe034e19bb7bf3511f3f2bd5b06e16c36e`)
 completed hover and +/-5 degree roll/pitch steps with a linearized actuator map
@@ -33,7 +33,7 @@ scaled yaw cell converges, while the 1000-gain cell diverges.
   become healthy by replaying the shim's cached truth. Synthetic dropout,
   latency, missing-source and recovery tests cover the boundary.
 - `USE_RPM=0` retains the legacy PID-baseline behavior. The measured path and
-  fallback still use the stock mixer; full C3 allocation has not been built.
+  fallback still use the stock mixer; full rotor-speed allocation has not been built.
 
 ## Small-flight gate
 
@@ -78,7 +78,8 @@ nix-build pkgs/nixos/sitl-envs/indi-actuator-probe.nix -A flight
 
 This expression always uses the checkout's lock pins. The larger VM expression
 still needs temporary `dependencies.nix local-build=true`; restore it to false
-before committing. Both firmware and harness are on `dev/indi-s4-phase2`.
+before committing. Firmware and harness changes are coordinated through their
+dependency PRs; the hub pins their exact revisions.
 
 ## Corrected DDS trajectory attempt
 
@@ -89,17 +90,17 @@ for two cases, and an EKF-reported peak altitude of 1344 m. Do not interpret its
 per-case RMS as valid comparisons: the engaged blocks no longer map one-to-one
 to the cases and the estimator was failing.
 
-Crucially, this is not a clean C2-onset test. At t=69.53 s, BEFORE custom control
+Crucially, this is not a clean measured-RPM feedback-onset test. At t=69.53 s, BEFORE custom control
 engaged at t=70.83 s, stock RATE already logged roll 238 deg/s. At the first
 INDU tick the gyro was `[2.78, 3.64, -1.36]` rad/s. The first active DDS outer
-sample was later, at t=76.43 s, after the EKF failsafe. Thus neither C2 nor DDS
+sample was later, at t=76.43 s, after the EKF failsafe. Thus neither measured-RPM feedback nor DDS
 caused the onset of this run's instability. The scorer now explicitly rejects
 an unsettled pre-engagement handover (>1 rad/s roll/pitch norm in the preceding
 two seconds). This is an additional validity check, not a relaxed acceptance
 threshold.
 
-Artifacts: `data/indi-c2-corrected-vm/{flight.BIN,indi_score.json}`,
-`data/indi-c2-first-divergence.log`, `data/indi-c2-engagement.log`.
+Artifacts: `data/indi-measured-rpm-trajectory-vm/{flight.BIN,indi_score.json}`,
+`data/indi-measured-rpm-onset.log`, `data/indi-measured-rpm-engagement.log`.
 Next isolate the stock GUIDED hold/takeoff on the linearized map, then verify a
 settled handover before enabling DDS. The small probe uses a shorter takeoff
 settle and attitude targets; it does not validate that longer position hold.
@@ -110,9 +111,9 @@ settle and attitude targets; it does not validate that longer position hold.
    repeat the DDS-driven trajectory battery; retain the
    stock collective controller until its separate thrust-state problem is solved.
 2. Only after clean trajectory flight, run PID/INDI x drag-off/drag-on comparisons.
-3. C3 is a candidate for allocation, saturation and RPM-loop benefits; it is not
+3. rotor-speed allocation is a candidate for allocation, saturation and RPM-loop benefits; it is not
    an established prerequisite from the August failure. Decide its scope from
-   these controlled results. S5 robustness and hardware validation remain open.
+   these controlled results. robustness robustness and hardware validation remain open.
 
 The August results and spec reframes are historical records. This handoff
 supersedes their causal certainty and the stale August 25 next-steps brief.

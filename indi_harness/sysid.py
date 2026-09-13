@@ -1,4 +1,4 @@
-"""Layer-C sysid: analytic effectiveness seed from known constants + a
+"""actuator feedback sysid: analytic effectiveness seed from known constants + a
 doublet-regression confirm. The analytic seed is BOTH the param seed and the
 regression oracle: identify_g1/identify_g2 excite the oracle QuadSim and
 regress the resulting torque/omega_dot trajectories to recover G1 and G2
@@ -10,7 +10,7 @@ from .simmodel import QuadSim
 
 
 def analytic_seed(params):
-    """Derive Layer-C effectiveness params from the quad constants.
+    """Derive actuator feedback effectiveness params from the quad constants.
     See indi_harness.params.QuadParams (mixer(), layout(), J, kf, km, arm, Ir,
     hover_speed(), Omega_min/max).
 
@@ -115,7 +115,7 @@ def identify_g1(params, T=0.4, amp=40.0, freq=2.5, dt=5e-4):
     """Doublet-regression recovery of G1 (torque-space effectiveness, 1/J).
 
     For each axis, drive the oracle QuadSim (indi_harness.simmodel.QuadSim,
-    the S0 reference physics) near hover with a sinusoidal per-rotor
+    the offline reference physics) near hover with a sinusoidal per-rotor
     perturbation from the single-axis allocation pattern above, so only that
     axis's torque is meaningfully excited. At each step we reconstruct the
     torque tau_k driving the sim from the KNOWN ACTUATOR MODEL only (mixer M

@@ -1,4 +1,4 @@
-# QuadSim (S0) is the reference physics; QuadJsonModel must converge to it.
+# QuadSim (offline) is the reference physics; QuadJsonModel must converge to it.
 # Same Omega(t) into both -> any difference is integrator-scheme only
 # (semi-implicit Euler world-frame vs pysignals SE(3) body-frame): the
 # tolerances below are a convergence bound, NOT bit-equality.

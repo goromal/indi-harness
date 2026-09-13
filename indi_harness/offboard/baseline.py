@@ -1,11 +1,11 @@
-"""S2 offboard battery: same 5 cases, flown by the offboard outer loop
-through the stock inner loop; scored identically to S1 (same evaluator,
+"""offboard battery: same 5 cases, flown by the offboard outer loop
+through the stock inner loop; scored identically to stock-guided (same evaluator,
 same .BIN source of truth) so the comparison is apples-to-apples.
 
 Usage (in the drone VM):
     python3 -m indi_harness.offboard.baseline \
         --url tcp:127.0.0.1:5790 --logs-dir /data/drone/ardusitl/logs \
-        --out /tmp/s2_offboard [--no-indi] [--imu-topic /ap/imu/experimental/data]
+        --out /tmp/offboard_flatness [--no-indi] [--imu-topic /ap/imu/experimental/data]
 """
 import argparse
 import json
@@ -74,8 +74,8 @@ def run_battery(url, logs_dir, out_dir, indi_accel, imu_topic):
 
     run_node(mission, imu_topic, spin_until_done)
     results = evaluate_flown(flown, logs_dir)
-    (out / "s2_offboard.json").write_text(results_json(results))
-    print(f"wrote {out / 's2_offboard.json'}", flush=True)
+    (out / "offboard_flatness.json").write_text(results_json(results))
+    print(f"wrote {out / 'offboard_flatness.json'}", flush=True)
     return results
 
 
@@ -83,7 +83,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--url", default="tcp:127.0.0.1:5790")
     ap.add_argument("--logs-dir", default="/data/drone/ardusitl/logs")
-    ap.add_argument("--out", default="/tmp/s2_offboard")
+    ap.add_argument("--out", default="/tmp/offboard_flatness")
     ap.add_argument("--no-indi", action="store_true",
                     help="PD+ff fallback (no IMU topic available)")
     ap.add_argument("--imu-topic", default="/ap/imu/experimental/data")

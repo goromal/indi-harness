@@ -1,7 +1,7 @@
-# AP_DDS topic audit (S2 prerequisite)
+# AP_DDS topic audit (offboard prerequisite)
 
 Empirical inventory of the `/ap/*` ROS 2 graph that ArduPilot's AP_DDS client
-publishes in the drone SITL VM. The design doc (§S2) requires this audit before
+publishes in the drone SITL VM. The design doc (§offboard) requires this audit before
 any offboard node code assumes a topic exists. Captured with the interactive
 `dronesim.nix` test driver (`ros-pkgs.rosPackages.jazzy` `ros-core` guest env,
 ArduCopter SITL, Micro-XRCE-DDS agent), vehicle idle on the ground (pre-arm).
@@ -15,7 +15,7 @@ ArduCopter SITL, Micro-XRCE-DDS agent), vehicle idle on the ground (pre-arm).
   `ardupilot_msgs` and `geographic_msgs`, so hz on the custom-typed topics
   (`/ap/airspeed`, `/ap/cmd_gps_pose`, `/ap/geopose/filtered`, `/ap/goal_lla`,
   `/ap/gps_global_origin/filtered`, `/ap/rc`, `/ap/status`) aborts with
-  "message type invalid". Rates below are for the standard-typed topics that S2
+  "message type invalid". Rates below are for the standard-typed topics that offboard
   actually consumes; the custom-typed ones are inventoried by type/QoS only.
 - `ros2 topic info -v` for QoS and publisher/subscriber counts.
 - `pymavlink` on the router GCS port (5790) for `LOCAL_POSITION_NED.time_boot_ms`
@@ -23,7 +23,7 @@ ArduCopter SITL, Micro-XRCE-DDS agent), vehicle idle on the ground (pre-arm).
 
 ## Topic inventory
 
-| Topic | Type | Measured rate (topic hz) | Role for S2 |
+| Topic | Type | Measured rate (topic hz) | Role for offboard |
 |-------|------|--------------------------|-------------|
 | `/ap/pose/filtered` | `geometry_msgs/msg/PoseStamped` | **27.6 Hz** | **primary** — node ticks on this (ENU/FLU pose) |
 | `/ap/twist/filtered` | `geometry_msgs/msg/TwistStamped` | **26.9 Hz** | velocity feedback (ENU) |
@@ -71,8 +71,8 @@ via `[a.x, -a.y, -a.z]`.
 
 The AP_DDS header stamps and `/ap/time` are wall/Unix time; the `.BIN` dataflash
 and `LOCAL_POSITION_NED` are ArduPilot boot-relative. These are different clocks.
-**The trajectory↔BIN join in Task 4 therefore uses `LOCAL_POSITION_NED.time_boot_ms`
-(the S1 mechanism), not the DDS pose stamps** — exactly as the plan requires. The
+**The trajectory↔BIN join in therefore uses `LOCAL_POSITION_NED.time_boot_ms`
+(the stock-guided mechanism), not the DDS pose stamps** — exactly as the plan requires. The
 node still derives trajectory time from the pose `header.stamp` deltas (monotone,
 sim-time-consistent) for feedforward phasing; only the .BIN scoring alignment uses
 boot ms.
@@ -89,9 +89,9 @@ AP_DDS exposes only these **subscriber** (command-in) topics:
 
 There is **no attitude+body-rate+thrust command topic** in the AP_DDS graph — the
 finest-grained command is a velocity twist. This is the documented justification
-for routing the S2 command path over MAVLink `SET_ATTITUDE_TARGET` on port 5790
-(design doc §T.1 pragmatic route) rather than through AP_DDS. Extending AP_DDS
-with an attitude-target subscriber is deferred to S3+ (§T.3).
+for routing the offboard command path over MAVLink `SET_ATTITUDE_TARGET` on port 5790
+ rather than through AP_DDS. Extending AP_DDS
+with an attitude-target subscriber is deferred to onboard+ (§T.3).
 
 ## Finding 4 — pose rate (~27.6 Hz) is below the assumed 50 Hz
 
@@ -99,8 +99,8 @@ The event-driven command rate equals the `/ap/pose/filtered` rate (~27.6 Hz in
 this SITL config), not the 50 Hz the bridge filters are constructed with by
 default (`rate_hz=50`). The Butter2 accel/thrust-state filters take `fs` at
 construction, so a 27.6 Hz stream fed to a 50 Hz-designed filter shifts the
-effective cutoff. For S2 (outer-loop logic + filter-tuning phase, latency-
+effective cutoff. For offboard (outer-loop logic + filter-tuning phase, latency-
 dominated; absolute-number mismatch is an accepted known limitation) this is
-acceptable, but Task 6's sitl-env should consider passing `rate_hz≈28` (or the
+acceptable, but 's sitl-env should consider passing `rate_hz≈28` (or the
 attribution doc should note the mismatch) so the filter cutoff is as designed.
 Recorded here as the landing site for that tuning decision.

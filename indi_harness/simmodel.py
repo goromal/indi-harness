@@ -55,5 +55,5 @@ class QuadSim:
         self.t += dt
 
     def specific_force(self):
-        """Body-frame accelerometer output (no noise in S0)."""
+        """Body-frame accelerometer output (no noise in offline)."""
         return quat.qrot_inv(self.q, self._a_world - np.array([0.0, 0.0, self.P.g]))

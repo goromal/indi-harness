@@ -1,7 +1,7 @@
-"""Buzz-closes scorer: the C2 primary success gate (S4 Phase 2 spec §5).
+"""Score measured-RPM feedback tracking, saturation, and acceleration inversion.
 
 All thresholds are explicit args so the calibrate-then-freeze values live in
-the CI env (Task 8), never hardcoded here.
+the CI env, never hardcoded here.
 """
 
 

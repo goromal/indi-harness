@@ -58,7 +58,7 @@ class QuadParams:
         return M
 
     def perturbed(self, kf_scale=1.0, km_scale=1.0, tau_scale=1.0):
-        """Controller-side model error injection (S5-style robustness tests)."""
+        """Controller-side model error injection (robustness-style robustness tests)."""
         return replace(self, kf=self.kf * kf_scale, km=self.km * km_scale,
                        tau_m=self.tau_m * tau_scale, J=self.J.copy(),
                        drag_D=self.drag_D.copy())

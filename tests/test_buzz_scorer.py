@@ -1,4 +1,4 @@
-"""Buzz-closes scorer unit tests (S4 Phase 2 spec §5): pure decision logic,
+"""Buzz-closes scorer unit tests (measured-RPM feedback spec §5): pure decision logic,
 no I/O or fixture .BIN needed."""
 from indi_harness.buzz_score import score
 

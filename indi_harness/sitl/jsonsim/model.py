@@ -3,7 +3,7 @@
 NED world, FRD body. State integrated by pysignals RigidBody6DOFModel; the
 quad-specific physics (rotor mixer, first-order motor lag, linear rotor drag)
 compose the body wrench u=[F;tau] fed to the integrator each step.
-Validated against the S0 numpy QuadSim (simmodel.py) in a later task.
+Validated against the offline numpy QuadSim (simmodel.py) in a later task.
 
 NOTE on the installed pysignals build: empirically (see tests/test_jsonsim_model.py
 history), RigidBody6DOFModel integrates v_dot = F/m - g_param, i.e. the g_param
@@ -131,7 +131,7 @@ class QuadJsonModel:
         else:
             accel_body = self._F_body / self.P.m
         # True (lagged) actuator state, as a real bidi-DShot ESC would report --
-        # from self._omega, NOT the commanded omega (see model docstring / Task 2).
+        # from self._omega, NOT the commanded omega (see model docstring / ).
         erpm = self.P.omega_to_erpm(self._omega)
         return {
             "timestamp": self.t,

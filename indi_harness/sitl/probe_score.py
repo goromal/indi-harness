@@ -1,6 +1,6 @@
 """Score a rate_probe run using simulator truth and firmware DataFlash.
 
-This small-flight gate is deliberately separate from the deferred S4 trajectory
+This small-flight gate is deliberately separate from the deferred realistic-physics trajectory
 gate. Freeze thresholds here before validating the corrected firmware.
 """
 import argparse

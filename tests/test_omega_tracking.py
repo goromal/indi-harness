@@ -16,7 +16,7 @@ def test_tracking_scores_low_nrmse():
 
 
 def test_divergence_scores_high_nrmse():
-    # Layer A's failure mode: an attenuated predictor (pred ~ 0.1*meas). Under
+    # legacy INDI rate controller's failure mode: an attenuated predictor (pred ~ 0.1*meas). Under
     # RMS-normalization this scores NRMSE ~ 0.9 -- correctly rejected by the
     # gate. (Range-normalization would score it ~0.3 and let it slip through,
     # which is exactly the metric bug this convention avoids.)
@@ -47,7 +47,7 @@ def test_gate_skips_unexcited_axis():
 
 def test_gate_does_not_enforce_yaw_even_when_excited():
     # The real SITL-battery case: yaw IS excited (the trajectory commands a
-    # continuous facing-turn) but its omega_dot-inversion is deferred to HW/S4
+    # continuous facing-turn) but its omega_dot-inversion is deferred to HW/realistic-physics
     # (needs the G2/RPM term SITL can't model). Roll/pitch track; yaw is excited
     # with a bad NRMSE. The default gate (axes=(0,1)) must PASS -- reporting yaw
     # but not enforcing it -- which mirrors run1: roll 0.48, pitch 0.49, yaw 2.46.
@@ -70,7 +70,7 @@ def test_gate_fails_when_enforced_axis_untracked():
     # If an ENFORCED axis (roll/pitch) fails to track, the gate must fail.
     t = np.linspace(0, 10, 2000)
     meas = np.stack([np.sin(t)]*3, axis=1)   # all excited
-    pred = 0.1 * meas                        # Layer-A attenuation -> NRMSE ~0.9
+    pred = 0.1 * meas                        # legacy INDI rate controller attenuation -> NRMSE ~0.9
     ok, per = omega_gate_ok(_health(pred, meas))
     assert per[0]["excited"] and per[0]["enforced"]
     assert not ok

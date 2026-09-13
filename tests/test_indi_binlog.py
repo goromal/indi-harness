@@ -1,5 +1,5 @@
-"""Parse the Layer-A INDI health message from a fixture .BIN captured from a
-CC_TYPE=INDI SITL hover (design doc L: the .BIN is source of truth)."""
+"""Parse the INDI health message from a fixture .BIN captured from a
+CC_TYPE=INDI SITL hover ."""
 import pathlib
 import numpy as np
 import pytest

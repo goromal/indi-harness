@@ -1,4 +1,4 @@
-"""INDI control allocation on rotor-speed-squared increments (Layer C math).
+"""INDI control allocation on rotor-speed-squared increments (actuator feedback math).
 
 Delta(Omega^2) = M^-1 [DeltaT; Delta_tau + G2 term]
 G2 term: measured rotor accel Om_dot reacts on body yaw as -Ir*(d . Om_dot);

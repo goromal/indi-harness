@@ -1,4 +1,4 @@
-"""NED <-> ENU conversion. This is THE one place it lives (design doc S1).
+"""NED <-> ENU conversion. This is THE one place it lives .
 
 MAVLink local frames are NED; ROS 2 / REP-103 is ENU. The mapping
 (N,E,D) <-> (E,N,U) is a swap of the first two axes and a z negation,

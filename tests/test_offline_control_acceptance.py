@@ -1,6 +1,6 @@
-"""S0 exit criterion (design doc: .claude/ardupilot-indi-plan.md, section S0).
+"""offline exit criterion .
 
-Green here == S0 complete; Stage 2 (S1 SITL baseline) may begin.
+Green here == offline complete; Stage 2 (stock-guided SITL baseline) may begin.
 """
 import numpy as np
 import pytest

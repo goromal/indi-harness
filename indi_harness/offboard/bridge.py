@@ -1,13 +1,13 @@
-"""Offboard outer loop (design doc S2): INDI linear-accel loop + flatness
+"""Offboard outer loop : INDI linear-accel loop + flatness
 attitude reference, emitting stock-inner-loop attitude+rate+thrust targets.
 
-Differences from the S0 in-sim OuterLoopINDI (deliberate, offboard realities):
+Differences from the offline in-sim OuterLoopINDI (deliberate, offboard realities):
 - Actuator state: no rotor speeds offboard -> the thrust-vector state is the
   *previously commanded* thrust vector passed through the same filter as the
   accel measurement (phase-matching rule, design doc #1 warning).
 - Output: normalized throttle via the learned hover-throttle linear map
-  (MOT_THST_HOVER); expo refinement deliberately omitted — S2 embraces
-  absolute-number mismatch (design doc S2 'known limitation').
+  (MOT_THST_HOVER); expo refinement deliberately omitted — offboard embraces
+  absolute-number mismatch .
 - indi_accel=False degrades to PD+ff on the reference (no accel measurement
   needed) — the fallback if the audit found no usable IMU topic.
 """
@@ -36,7 +36,7 @@ class OffboardGains:
     # ~(command-path latency) ticks ago; f_state must be delayed to match, or
     # the residual accumulates and f_cmd winds up (the offboard-flight failure
     # mode). 1 = "previous tick" (correct only when the actuator responds
-    # within a tick, e.g. the in-sim S0 loop); set ~= measured command-path
+    # within a tick, e.g. the in-sim offline loop); set ~= measured command-path
     # latency in ticks for a latency-laden path. NOTE: robust to
     # under-estimating the latency, unstable if you over-estimate — bias low.
     cmd_delay_ticks: int = 1

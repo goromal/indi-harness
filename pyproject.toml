@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "indi-harness"
 version = "0.2.0"
-description = "Quaternion INDI prototype + trajectory harness (S0/S1 of the ArduPilot INDI plan)"
+description = "Quaternion INDI control models, rotor-dynamics simulator, and SITL trajectory harness"
 requires-python = ">=3.10"
 dependencies = ["numpy", "pyyaml", "pymavlink", "rosbags"]
 

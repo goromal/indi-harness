@@ -111,8 +111,8 @@ def latency_rmse(indi_accel, cmd_delay_ticks=1, plant_delay=5, fs=27.0):
 def test_indi_needs_delay_alignment_under_latency():
     # Default INDI (cmd_delay_ticks=1) winds up when the command path is
     # latent; delay-aligning f_state to the command latency recovers it to
-    # PD+ff-quality tracking. This is the mechanism behind flying S2 with
-    # --no-indi (design-doc S2) — the fix is synchronization, not anti-windup.
+    # PD+ff-quality tracking. This is the mechanism behind flying offboard with
+    # --no-indi  — the fix is synchronization, not anti-windup.
     diverged = latency_rmse(indi_accel=True, cmd_delay_ticks=1, plant_delay=5)
     aligned = latency_rmse(indi_accel=True, cmd_delay_ticks=4, plant_delay=5)
     pd_ff = latency_rmse(indi_accel=False, plant_delay=5)
