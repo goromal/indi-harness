@@ -59,6 +59,16 @@ def test_fly_sends_setpoints_and_records():
     assert np.allclose(p_ref[0], origin, atol=1e-9)
 
 
+def test_fly_checks_each_received_position():
+    conn = FakeConn()
+    positions = []
+    s = GuidedStreamer(conn, rate_hz=2.0, realtime=False)
+    s.fly(Circle(radius=2.0, period=8.0, alt=10.0), duration=2.0,
+          origin=np.array([1.0, 2.0, -10.0]),
+          on_position=lambda message: positions.append(message.z))
+    assert positions == [-10.0] * 4
+
+
 def test_arm_retries_then_succeeds():
     conn = FakeConn(arm_after_attempts=3)
     s = GuidedStreamer(conn, rate_hz=50.0, realtime=False)
