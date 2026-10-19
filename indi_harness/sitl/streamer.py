@@ -88,7 +88,7 @@ class GuidedStreamer:
             raise TimeoutError("no LOCAL_POSITION_NED")
         return np.array([m.x, m.y, m.z])
 
-    def fly(self, traj, duration, origin, record=None):
+    def fly(self, traj, duration, origin, record=None, on_position=None):
         """Stream ref(t) = origin + (traj.p(t) - traj.p(0)) at rate_hz."""
         rec = record or FlightRecord()
         fo0 = traj.ref(0.0)
@@ -108,6 +108,8 @@ class GuidedStreamer:
                 f["yaw"], f["yaw_rate"])
             m = self.conn.recv_match(type="LOCAL_POSITION_NED", blocking=False)
             if m is not None:
+                if on_position is not None:
+                    on_position(m)
                 rec.traj_t.append(t)
                 rec.boot_ms.append(m.time_boot_ms)
                 rec.p.append([m.x, m.y, m.z])
