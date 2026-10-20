@@ -12,6 +12,7 @@ from pymavlink import mavutil
 from .setpoints import Setpoint, PVA_TYPEMASK, MAV_FRAME_LOCAL_NED
 
 GUIDED_CUSTOM_MODE = 4  # ArduCopter GUIDED
+ARMED = mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED
 
 
 @dataclass
@@ -42,6 +43,22 @@ class GuidedStreamer:
         if self.realtime and dt > 0:
             time.sleep(dt)
 
+    def _latest(self, msg_type, timeout=2.0):
+        """Newest queued `msg_type`, or the next one to arrive. recv_match
+        returns the OLDEST queued message, and the 20 Hz streams back up while
+        the runner waits, so without draining the runner acts on state ~10 s
+        old -- long enough to race ArduCopter's 10 s auto-disarm."""
+        latest = None
+        while True:
+            m = self.conn.recv_match(type=msg_type, blocking=False)
+            if m is None:
+                break
+            latest = m
+        if latest is None:
+            latest = self.conn.recv_match(type=msg_type, blocking=True,
+                                          timeout=timeout)
+        return latest
+
     def set_mode_guided(self, timeout=60.0):
         t0 = time.monotonic()
         while time.monotonic() - t0 < timeout:
@@ -62,21 +79,29 @@ class GuidedStreamer:
                 self.conn.target_system, self.conn.target_component,
                 mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, 0,
                 1, 0, 0, 0, 0, 0, 0)
-            hb = self.conn.recv_match(type="HEARTBEAT", blocking=True, timeout=2)
-            if hb is not None and (hb.base_mode
-                                   & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED):
+            hb = self._latest("HEARTBEAT")
+            if hb is not None and hb.base_mode & ARMED:
                 return
             self._sleep(retry_s)
         raise TimeoutError("arming failed (prearm checks may still be settling)")
 
-    def takeoff(self, alt_m, timeout=120.0):
+    def _send_takeoff(self, alt_m):
         self.conn.mav.command_long_send(
             self.conn.target_system, self.conn.target_component,
             mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 0, 0, 0, 0, 0, alt_m)
+
+    def takeoff(self, alt_m, timeout=120.0):
+        """Take off and wait for 90% of `alt_m`. ArduCopter auto-disarms a
+        landed vehicle DISARM_DELAY after arming and rejects a takeoff sent
+        after that, so re-arm and re-send whenever the vehicle is disarmed."""
+        self._send_takeoff(alt_m)
         t0 = time.monotonic()
         while time.monotonic() - t0 < timeout:
-            m = self.conn.recv_match(type="LOCAL_POSITION_NED", blocking=True,
-                                     timeout=5)
+            hb = self._latest("HEARTBEAT")
+            if hb is not None and not hb.base_mode & ARMED:
+                self.arm(timeout=max(1.0, timeout - (time.monotonic() - t0)))
+                self._send_takeoff(alt_m)
+            m = self._latest("LOCAL_POSITION_NED", timeout=5)
             if m is not None and -m.z > 0.9 * alt_m:
                 return np.array([m.x, m.y, m.z])
         raise TimeoutError("takeoff altitude not reached")
