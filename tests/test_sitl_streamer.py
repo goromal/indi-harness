@@ -156,3 +156,14 @@ def test_takeoff_rearms_and_retries_when_the_vehicle_auto_disarmed():
     assert ap.alt >= 9.0
     assert ap.commands.count(NAV_TAKEOFF) == 2
     assert ARM_DISARM in ap.commands
+
+
+def test_local_position_reads_the_newest_sample_not_a_stale_backlog():
+    # The battery runners sleep between cases while 20 Hz LOCAL_POSITION_NED
+    # backs up. Reading the oldest queued sample latched the next case origin
+    # where the previous case ended, not where the vehicle is at engagement.
+    stale = [Msg(mtype="LOCAL_POSITION_NED", x=2.4, y=0.0, z=-10.0)] * 60
+    current = Msg(mtype="LOCAL_POSITION_NED", x=0.1, y=0.0, z=-10.0)
+    ap = QueuedAutopilot(armed=True, backlog=stale + [current])
+    origin = GuidedStreamer(ap, realtime=False).local_position()
+    assert np.allclose(origin, [0.1, 0.0, -10.0])

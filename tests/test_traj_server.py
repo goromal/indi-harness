@@ -12,10 +12,11 @@ CASES = {c.name: c for c in BATTERY}
 
 def test_elapsed_latches_and_clamps():
     s = TrajServer(CASES["circle_slow"])
-    # first call latches t0; time is relative and clamped to [0, duration]
+    # first call latches t0; time is relative and clamped to [0, duration],
+    # where duration includes the terminal brake
     assert s.elapsed(100.0) == 0.0
     assert s.elapsed(105.0) == 5.0
-    assert s.elapsed(100.0 + s.case.duration + 50.0) == s.case.duration
+    assert s.elapsed(100.0 + s.duration + 50.0) == s.duration
 
 
 def test_sample_shifts_to_origin():
@@ -92,3 +93,17 @@ def test_battery_switching_via_ready_file(tmp_path):
     tick(20.0)
     assert s.case is CASES["lemniscate_slow"]
     assert s.elapsed(21.0) == 1.0          # clock re-latched at the switch
+
+
+@pytest.mark.parametrize("name", ["circle_slow", "lemniscate_fast"])
+def test_reference_ends_at_rest_on_the_hold_point(name):
+    # Holding ref(duration) kept commanding the path's end velocity at a fixed
+    # position, so the vehicle coasted ~1 m before the stock fallback.
+    s = TrajServer(CASES[name])
+    origin = np.array([10.0, -5.0, -10.0])
+    s.set_origin(origin)
+    s.elapsed(100.0)
+    fo = s.sample(s.elapsed(100.0 + s.duration + 5.0))
+    assert np.allclose(fo.p, origin, atol=1e-9)
+    assert np.allclose(fo.v, 0.0, atol=1e-9)
+    assert np.allclose(fo.a, 0.0, atol=1e-9)

@@ -21,8 +21,18 @@ import pathlib
 
 import numpy as np
 
-from ..trajectory import FlatOutput
+from ..trajectory import FlatOutput, SmoothStop
 from .node import _Shifted
+
+# Terminal braking time [s]: each case reference slows along its path and comes
+# to rest at its end point, which is the runner's GUIDED hold point.
+BRAKE_S = 3.0
+
+
+def reference_duration(case):
+    """Length of a case's DDS reference including its terminal brake; the
+    runner must hold the ready-file this long."""
+    return case.duration + BRAKE_S / 2
 
 
 class TrajServer:
@@ -34,6 +44,10 @@ class TrajServer:
         self.case = case
         self.origin = None
         self._t0 = None
+
+    @property
+    def duration(self):
+        return reference_duration(self.case)
 
     def set_origin(self, p_ned):
         self.origin = np.asarray(p_ned, float)
@@ -49,17 +63,18 @@ class TrajServer:
 
     def elapsed(self, t_now):
         """Trajectory time from an absolute clock reading (latched on first
-        call). Held at the trajectory duration after it completes so the last
-        setpoint is a valid hover-at-end rather than an extrapolation."""
+        call). Held at the reference duration after it completes, where the
+        braked reference is at rest at its end point."""
         if self._t0 is None:
             self._t0 = t_now
         t = t_now - self._t0
-        return min(max(t, 0.0), self.case.duration)
+        return min(max(t, 0.0), self.duration)
 
     def sample(self, t):
         """FlatOutput (NED) at trajectory time t, shifted to the origin."""
-        traj = _Shifted(self.case.traj, self.origin) if self.origin is not None \
-            else self.case.traj
+        traj = SmoothStop(self.case.traj, self.case.duration, BRAKE_S)
+        if self.origin is not None:
+            traj = _Shifted(traj, self.origin)
         return traj.ref(t)
 
 

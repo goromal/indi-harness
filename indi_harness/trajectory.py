@@ -124,3 +124,47 @@ class PolynomialTrajectory:
 
         return FlatOutput(arr(0), arr(1), arr(2), arr(3), arr(4),
                           vals["yaw"][0], vals["yaw"][1], vals["yaw"][2])
+
+
+class SmoothStop:
+    """Bring `path` to rest at path.ref(end_time) instead of ending abruptly.
+
+    Trajectory time is warped, tau(t): identity until end_time - brake_s/2,
+    then the path speed ratio dtau/dt falls 1 -> 0 over brake_s along a septic
+    smoothstep (zero 1st-3rd derivatives at both ends), so p..snap stay
+    continuous. The ratio integrates to brake_s/2 over the brake, so tau
+    reaches end_time exactly at duration = end_time + brake_s/2 and holds."""
+
+    def __init__(self, path, end_time, brake_s):
+        self.path, self.end_time, self.brake_s = path, float(end_time), float(brake_s)
+        self.brake_start = self.end_time - self.brake_s / 2
+        self.duration = self.end_time + self.brake_s / 2
+
+    def _warp(self, t):
+        """tau and its first four time derivatives."""
+        if t <= self.brake_start:
+            return t, 1.0, 0.0, 0.0, 0.0
+        if t >= self.brake_start + self.brake_s:
+            return self.end_time, 0.0, 0.0, 0.0, 0.0
+        b = self.brake_s
+        u = (t - self.brake_start) / b
+        # smoothstep sigma(u) = 35u^4 - 84u^5 + 70u^6 - 20u^7 and derivatives
+        sigma = 35 * u**4 - 84 * u**5 + 70 * u**6 - 20 * u**7
+        dsigma = 140 * u**3 - 420 * u**4 + 420 * u**5 - 140 * u**6
+        d2sigma = 420 * u**2 - 1680 * u**3 + 2100 * u**4 - 840 * u**5
+        d3sigma = 840 * u - 5040 * u**2 + 8400 * u**3 - 4200 * u**4
+        integral = u - (7 * u**5 - 14 * u**6 + 10 * u**7 - 2.5 * u**8)
+        return (self.brake_start + b * integral, 1.0 - sigma,
+                -dsigma / b, -d2sigma / b**2, -d3sigma / b**3)
+
+    def ref(self, t):
+        tau, w1, w2, w3, w4 = self._warp(float(t))
+        f = self.path.ref(tau)
+        # chain rule (Faa di Bruno) for p(tau(t)) through 4th order
+        v = f.v * w1
+        a = f.a * w1**2 + f.v * w2
+        j = f.j * w1**3 + 3 * f.a * w1 * w2 + f.v * w3
+        s = (f.s * w1**4 + 6 * f.j * w1**2 * w2
+             + f.a * (3 * w2**2 + 4 * w1 * w3) + f.v * w4)
+        return FlatOutput(f.p, v, a, j, s, f.psi, f.dpsi * w1,
+                          f.ddpsi * w1**2 + f.dpsi * w2)

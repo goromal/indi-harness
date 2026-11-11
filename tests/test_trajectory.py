@@ -3,7 +3,8 @@ import pathlib
 import numpy as np
 import pytest
 from indi_harness.trajectory import (Circle, Lemniscate, Hover,
-                                     PolynomialTrajectory, FlatOutput)
+                                     PolynomialTrajectory, FlatOutput,
+                                     SmoothStop)
 
 H = 1e-3
 REPO = pathlib.Path(__file__).resolve().parent.parent
@@ -56,3 +57,36 @@ def test_multi_segment_boundary():
 def test_ned_altitude_is_negative_z():
     # alt=5 means z = -5 in NED
     assert Circle(radius=1.0, period=4.0, alt=5.0).ref(0.0).p[2] == -5.0
+
+
+STOP_PATHS = [Circle(radius=2.0, period=8.0, alt=10.0),
+              Lemniscate(amplitude=2.0, period=8.0, alt=10.0)]
+
+
+@pytest.mark.parametrize("path", STOP_PATHS)
+def test_smooth_stop_follows_the_path_until_braking(path):
+    stop = SmoothStop(path, end_time=16.0, brake_s=3.0)
+    assert stop.duration == pytest.approx(17.5)
+    for t in (0.0, 5.0, 14.49):
+        a, b = stop.ref(t), path.ref(t)
+        assert np.allclose(a.p, b.p) and np.allclose(a.v, b.v)
+        assert np.allclose(a.s, b.s)
+
+
+@pytest.mark.parametrize("path", STOP_PATHS)
+def test_smooth_stop_derivatives_stay_consistent_through_braking(path):
+    stop = SmoothStop(path, end_time=16.0, brake_s=3.0)
+    for t in np.linspace(14.0, 18.0, 17):
+        fd_check(stop, t)
+
+
+@pytest.mark.parametrize("path", STOP_PATHS)
+def test_smooth_stop_rests_at_the_path_end_point(path):
+    # The reference must come to rest where the path ends rather than hold the
+    # end point while still commanding the path's end velocity.
+    stop = SmoothStop(path, end_time=16.0, brake_s=3.0)
+    for t in (stop.duration, stop.duration + 5.0):
+        fo = stop.ref(t)
+        assert np.allclose(fo.p, path.ref(16.0).p, atol=1e-9)
+        for d in (fo.v, fo.a, fo.j, fo.s):
+            assert np.allclose(d, 0.0, atol=1e-9)

@@ -107,8 +107,10 @@ class GuidedStreamer:
         raise TimeoutError("takeoff altitude not reached")
 
     def local_position(self, timeout=10.0):
-        m = self.conn.recv_match(type="LOCAL_POSITION_NED", blocking=True,
-                                 timeout=timeout)
+        """Current position. Battery runners latch each case origin here after
+        an inter-case wait, so a queued sample would place the origin where
+        the previous case ended rather than where the vehicle engages."""
+        m = self._latest("LOCAL_POSITION_NED", timeout=timeout)
         if m is None:
             raise TimeoutError("no LOCAL_POSITION_NED")
         return np.array([m.x, m.y, m.z])
