@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from indi_harness.trajectory import (Circle, Lemniscate, Hover,
                                      PolynomialTrajectory, FlatOutput,
-                                     SmoothStop)
+                                     SmoothStart, SmoothStop)
 
 H = 1e-3
 REPO = pathlib.Path(__file__).resolve().parent.parent
@@ -90,3 +90,32 @@ def test_smooth_stop_rests_at_the_path_end_point(path):
         assert np.allclose(fo.p, path.ref(16.0).p, atol=1e-9)
         for d in (fo.v, fo.a, fo.j, fo.s):
             assert np.allclose(d, 0.0, atol=1e-9)
+
+
+@pytest.mark.parametrize("path", STOP_PATHS)
+def test_smooth_start_begins_at_rest_on_the_path_start_point(path):
+    # The paths begin at full speed; a vehicle engaging from hover lagged the
+    # reference by ~0.8 m before it caught up.
+    start = SmoothStart(path, ramp_s=3.0)
+    assert start.duration == pytest.approx(path.duration + 1.5)
+    for t in (-1.0, 0.0):
+        fo = start.ref(t)
+        assert np.allclose(fo.p, path.ref(0.0).p, atol=1e-9)
+        for d in (fo.v, fo.a, fo.j, fo.s):
+            assert np.allclose(d, 0.0, atol=1e-9)
+
+
+@pytest.mark.parametrize("path", STOP_PATHS)
+def test_smooth_start_derivatives_stay_consistent_through_the_ramp(path):
+    start = SmoothStart(path, ramp_s=3.0)
+    for t in np.linspace(0.01, 4.0, 17):
+        fd_check(start, t)
+
+
+@pytest.mark.parametrize("path", STOP_PATHS)
+def test_smooth_start_follows_the_path_after_the_ramp(path):
+    start = SmoothStart(path, ramp_s=3.0)
+    for t in (3.0, 5.0, 7.5):
+        a, b = start.ref(t), path.ref(t - 1.5)
+        assert np.allclose(a.p, b.p) and np.allclose(a.v, b.v)
+        assert np.allclose(a.s, b.s)

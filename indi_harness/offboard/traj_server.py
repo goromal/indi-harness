@@ -21,18 +21,19 @@ import pathlib
 
 import numpy as np
 
-from ..trajectory import FlatOutput, SmoothStop
+from ..trajectory import FlatOutput, SmoothStart, SmoothStop
 from .node import _Shifted
 
-# Terminal braking time [s]: each case reference slows along its path and comes
-# to rest at its end point, which is the runner's GUIDED hold point.
-BRAKE_S = 3.0
+# Ramp time [s] at each end of a case reference: it starts from rest at the
+# engagement origin and comes to rest at its end point, which is the runner's
+# GUIDED hold point. Each ramp adds RAMP_S/2 to the reference.
+RAMP_S = 3.0
 
 
 def reference_duration(case):
-    """Length of a case's DDS reference including its terminal brake; the
-    runner must hold the ready-file this long."""
-    return case.duration + BRAKE_S / 2
+    """Length of a case's DDS reference including its start and stop ramps;
+    the runner must hold the ready-file this long."""
+    return case.duration + RAMP_S
 
 
 class TrajServer:
@@ -72,7 +73,8 @@ class TrajServer:
 
     def sample(self, t):
         """FlatOutput (NED) at trajectory time t, shifted to the origin."""
-        traj = SmoothStop(self.case.traj, self.case.duration, BRAKE_S)
+        traj = SmoothStart(SmoothStop(self.case.traj, self.case.duration,
+                                      RAMP_S), RAMP_S)
         if self.origin is not None:
             traj = _Shifted(traj, self.origin)
         return traj.ref(t)
