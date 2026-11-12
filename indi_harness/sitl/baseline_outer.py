@@ -31,6 +31,7 @@ from ..trajectory import Hover
 from .baseline import BATTERY, ALT_M
 from .baseline_cc import engage_custom_controller, _wait_gps_fix
 from .streamer import GuidedStreamer, FlightRecord
+from ..offboard.traj_server import reference_duration
 
 
 def _hold(s, duration, origin, on_position=None):
@@ -124,10 +125,11 @@ def run_battery_outer(url, out_dir, engage_rc=9, ready_file=None,
                 pathlib.Path(ready_file).write_text(
                     json.dumps({"case": case.name,
                                 "origin": [float(x) for x in origin]}))
-            print(f"holding for {case.name} ({case.duration:.0f} s) -- "
+            hold_s = reference_duration(case)
+            print(f"holding for {case.name} ({hold_s:.1f} s) -- "
                   f"outer loop flies via DDS", flush=True)
             try:
-                rec = _hold(s, case.duration, origin,
+                rec = _hold(s, hold_s, origin,
                             on_position=check_position)
             finally:
                 if ready_file is not None:

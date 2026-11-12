@@ -4,7 +4,7 @@ ready-file protocol that drives battery mode / the DDS-staleness fallback."""
 import json
 import numpy as np
 import pytest
-from indi_harness.offboard.traj_server import TrajServer, read_ready
+from indi_harness.offboard.traj_server import RAMP_S, TrajServer, read_ready
 from indi_harness.sitl.baseline import BATTERY
 
 CASES = {c.name: c for c in BATTERY}
@@ -12,10 +12,11 @@ CASES = {c.name: c for c in BATTERY}
 
 def test_elapsed_latches_and_clamps():
     s = TrajServer(CASES["circle_slow"])
-    # first call latches t0; time is relative and clamped to [0, duration]
+    # first call latches t0; time is relative and clamped to [0, duration],
+    # where duration includes the terminal brake
     assert s.elapsed(100.0) == 0.0
     assert s.elapsed(105.0) == 5.0
-    assert s.elapsed(100.0 + s.case.duration + 50.0) == s.case.duration
+    assert s.elapsed(100.0 + s.duration + 50.0) == s.duration
 
 
 def test_sample_shifts_to_origin():
@@ -26,7 +27,8 @@ def test_sample_shifts_to_origin():
     base0 = s.case.traj.ref(0.0).p
     fo = s.sample(0.0)
     assert np.allclose(fo.p, origin, atol=1e-9)
-    fo3 = s.sample(3.0)
+    # past the start ramp, reference time runs RAMP_S/2 behind path time
+    fo3 = s.sample(3.0 + RAMP_S / 2)
     expected = origin + (s.case.traj.ref(3.0).p - base0)
     assert np.allclose(fo3.p, expected, atol=1e-9)
 
@@ -92,3 +94,30 @@ def test_battery_switching_via_ready_file(tmp_path):
     tick(20.0)
     assert s.case is CASES["lemniscate_slow"]
     assert s.elapsed(21.0) == 1.0          # clock re-latched at the switch
+
+
+@pytest.mark.parametrize("name", ["circle_slow", "lemniscate_fast"])
+def test_reference_ends_at_rest_on_the_hold_point(name):
+    # Holding ref(duration) kept commanding the path's end velocity at a fixed
+    # position, so the vehicle coasted ~1 m before the stock fallback.
+    s = TrajServer(CASES[name])
+    origin = np.array([10.0, -5.0, -10.0])
+    s.set_origin(origin)
+    s.elapsed(100.0)
+    fo = s.sample(s.elapsed(100.0 + s.duration + 5.0))
+    assert np.allclose(fo.p, origin, atol=1e-9)
+    assert np.allclose(fo.v, 0.0, atol=1e-9)
+    assert np.allclose(fo.a, 0.0, atol=1e-9)
+
+
+@pytest.mark.parametrize("name", ["circle_slow", "lemniscate_fast"])
+def test_reference_starts_at_rest_on_the_engagement_origin(name):
+    # The paths begin at full speed, so a vehicle engaging from hover lagged
+    # the reference by ~0.8 m for the first second.
+    s = TrajServer(CASES[name])
+    origin = np.array([10.0, -5.0, -10.0])
+    s.set_origin(origin)
+    fo = s.sample(s.elapsed(100.0))
+    assert np.allclose(fo.p, origin, atol=1e-9)
+    assert np.allclose(fo.v, 0.0, atol=1e-9)
+    assert np.allclose(fo.a, 0.0, atol=1e-9)
