@@ -58,3 +58,36 @@ The small flight is a passing regression, not a substitute for trajectory
 acceptance. The latest larger attempt had an unstable stock handover before
 custom control engaged. Establish a settled stock GUIDED hold on the linearized
 map before repeating trajectories and the PID/INDI drag comparison.
+
+## Delay-compensated angular-acceleration gate (November)
+
+The `INDI` row logs `Px`, the commanded angular acceleration ν at tick k, and
+`Mx`, the filtered measured angular acceleration, under one timestamp. They are
+not time-aligned by construction. With an exact inversion the true angular
+acceleration follows ν through the actuator dynamics, and `Mx` sees it through
+the stock gyro filter and the INDI estimator filter. On the JSON plant that
+chain is about 30–50 ms: the motor lag is `tau_m` = 30 ms and
+`INS_GYRO_FILTER` is 20 Hz. A raw `Px`-vs-`Mx` NRMSE therefore cannot reach
+0.6 above about 2 Hz content, however good the inversion is.
+
+`indi_harness.sitl.response_model` passes `Px` through that known chain: one
+frame of delay, the plant motor lag, then the logged `INS_GYRO_FILTER` and
+`CC3_OMG_FILT` Butterworth filters. Nothing is fitted. The trajectory gate
+scores `Mx` against this expected response with the unchanged 0.6 threshold.
+It counts only roll/pitch axes that are excited (`exc_rms` ≥ 0.08), and it
+fails a case where no enforced axis is excited. The raw NRMSE is still reported
+beside it, so the transport delay stays visible. An attenuated response, such
+as a wrong effectiveness gain, still fails the gate.
+
+| Run | Case | Raw roll/pitch | Compensated roll/pitch |
+|---|---|---:|---:|
+| X layout, abrupt start | circle_slow | 1.043 / 1.456 | 0.131 / 0.164 |
+| X layout, abrupt start | lemniscate_fast | 1.019 / 1.133 | 0.239 / 0.390 |
+| Smooth start/stop | circle_slow | 2.302 / 2.544 | 0.262 / 0.292 |
+| Smooth start/stop | lemniscate_fast | 1.041 / 1.530 | 0.130 / 0.242 |
+| Smooth, `INS_GYRO_FILTER` 60 | circle_slow | 2.790 / 2.988 | 0.331 / 0.356 |
+| Smooth, `INS_GYRO_FILTER` 60 | lemniscate_fast | 0.950 / 1.438 | 0.176 / 0.226 |
+
+Raising `INS_GYRO_FILTER` to 60 Hz did not close the raw gate: the 30 ms motor
+lag is plant physics, not controller delay. On hardware, the motor time
+constant must come from bench identification rather than simulator parameters.
