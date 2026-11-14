@@ -9,7 +9,7 @@ arrays explicitly (no module-level state) so they stay pure.
 import numpy as np
 from pymavlink import DFReader
 
-from .align import omega_tracking_score
+from .align import omega_tracking_score, delay_compensated_tracking_score
 
 RAD2DEG = 180.0 / np.pi
 
@@ -120,6 +120,19 @@ def omega_window(ih, t0, t1):
         "sat_frac": float(sat.mean()) if sat.size else 0.0,
     }
 
+
+
+def compensated_omega_window(ih, expected, chain, t0, t1):
+    """Delay-compensated per-axis omega_dot score over an INDI TimeUS window.
+
+    expected is sitl.response_model.expected_measured_accel computed over the
+    WHOLE flight (same rows as ih), so filter state is continuous into the
+    window. Each axis carries nrmse (compensated) and nrmse_raw."""
+    it = ih["time_us"]
+    w = (it >= t0) & (it <= t1)
+    ihw = {"domega_pred": ih["domega_pred"][w], "domega_meas": ih["domega_meas"][w]}
+    om = delay_compensated_tracking_score(ihw, chain, expected=np.asarray(expected)[w])
+    return {"roll": om[0], "pitch": om[1], "yaw": om[2]}
 
 def rate_window(rt, rdes, ract, pdes, pact, t0, t1):
     """Roll/pitch rate tracking + buzz proxy over a RATE TimeUS window (arrays
