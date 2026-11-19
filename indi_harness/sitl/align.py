@@ -6,6 +6,7 @@ is then scored on the trajectory timeline via evalmetrics.rmse_position.
 """
 import numpy as np
 from ..evalmetrics import rmse_position
+from .response_model import expected_measured_accel
 
 
 def boot_to_traj_map(traj_t, boot_ms):
@@ -46,8 +47,12 @@ def omega_tracking_score(health):
     which skips unexcited axes -- otherwise a quiescent yaw/roll produces a
     phantom failure (learned the hard way: circle_slow barely excites yaw, and a
     forward step barely excites roll)."""
-    pred = np.asarray(health["domega_pred"], float)
-    meas = np.asarray(health["domega_meas"], float)
+    return _axis_scores(health["domega_pred"], health["domega_meas"])
+
+
+def _axis_scores(pred, meas):
+    pred = np.asarray(pred, float)
+    meas = np.asarray(meas, float)
     out = {}
     for ax in range(3):
         m, p = meas[:, ax], pred[:, ax]
@@ -59,6 +64,37 @@ def omega_tracking_score(health):
         r2 = 1.0 - ss_res / ss_tot if ss_tot > 1e-12 else 0.0
         out[ax] = {"nrmse": nrmse, "r2": r2, "exc_rms": rms_m}
     return out
+
+
+def delay_compensated_tracking_score(health, chain, expected=None):
+    """Per-axis omega_dot score of the measured accel against the commanded
+    accel passed through the known actuator/sensor chain
+    (sitl.response_model). Returns per axis {nrmse, r2, exc_rms} for the
+    compensated comparison plus nrmse_raw / r2_raw for the uncompensated one,
+    so the transport delay stays visible in every report.
+
+    `expected` may be precomputed over the whole flight (then windowed by the
+    caller together with `health`) so filter state is continuous across a
+    case window."""
+    if expected is None:
+        expected = expected_measured_accel(
+            health["domega_pred"], chain, time_us=health.get("time_us"))
+    comp = _axis_scores(expected, health["domega_meas"])
+    raw = _axis_scores(health["domega_pred"], health["domega_meas"])
+    for ax in range(3):
+        comp[ax]["nrmse_raw"] = raw[ax]["nrmse"]
+        comp[ax]["r2_raw"] = raw[ax]["r2"]
+    return comp
+
+
+def excited_axis_nrmse(per_axis, axes=(0, 1), exc_floor=0.08):
+    """Worst NRMSE over the enforced axes that are actually excited
+    (exc_rms >= exc_floor, the omega_gate_ok rule). None when no enforced axis
+    is excited: the case did not test the inversion, which must fail a gate
+    rather than pass it."""
+    excited = [per_axis[ax]["nrmse"] for ax in axes
+               if per_axis[ax]["exc_rms"] >= exc_floor]
+    return max(excited) if excited else None
 
 
 def omega_gate_ok(health, axes=(0, 1), nrmse_max=0.75, exc_floor=0.08):
