@@ -167,3 +167,35 @@ def test_local_position_reads_the_newest_sample_not_a_stale_backlog():
     ap = QueuedAutopilot(armed=True, backlog=stale + [current])
     origin = GuidedStreamer(ap, realtime=False).local_position()
     assert np.allclose(origin, [0.1, 0.0, -10.0])
+
+
+class FakeClock:
+    """Monotonic clock advanced by sleeps and by a per-send cost."""
+
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
+
+    def sleep(self, dt):
+        self.now += max(dt, 0.0)
+
+
+def test_fly_reference_clock_tracks_elapsed_time():
+    """Loop overhead must not slow the streamed position reference relative
+    to its velocity/acceleration feedforward: the sample sent at trajectory
+    time t goes out at elapsed time t."""
+    clock = FakeClock()
+    conn = FakeConn()
+    send = conn.mav.set_position_target_local_ned_send
+
+    def costly_send(*args):
+        clock.now += 0.001
+        send(*args)
+
+    conn.mav.set_position_target_local_ned_send = costly_send
+    s = GuidedStreamer(conn, rate_hz=50.0, clock=clock, sleep=clock.sleep)
+    s.fly(Circle(radius=2.0, period=8.0, alt=10.0), duration=2.0,
+          origin=np.zeros(3))
+    assert clock.now == pytest.approx(2.0, abs=0.02)
