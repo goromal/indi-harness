@@ -36,6 +36,12 @@ def reference_duration(case):
     return case.duration + RAMP_S
 
 
+def ramped_reference(case):
+    """A case's trajectory with its start and stop ramps: the reference every
+    controller under comparison is asked to fly."""
+    return SmoothStart(SmoothStop(case.traj, case.duration, RAMP_S), RAMP_S)
+
+
 class TrajServer:
     """Pure flat-reference sampler. Holds a trajectory Case and, once an origin
     is set, produces FlatSetpoint field dicts (NED) at arbitrary trajectory
@@ -73,8 +79,7 @@ class TrajServer:
 
     def sample(self, t):
         """FlatOutput (NED) at trajectory time t, shifted to the origin."""
-        traj = SmoothStart(SmoothStop(self.case.traj, self.case.duration,
-                                      RAMP_S), RAMP_S)
+        traj = ramped_reference(self.case)
         if self.origin is not None:
             traj = _Shifted(traj, self.origin)
         return traj.ref(t)

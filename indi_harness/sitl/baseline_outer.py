@@ -16,6 +16,13 @@ engages, then writes {case, origin} to --ready-file and holds for the requested
 duration; the caller starts traj_server once the ready file exists so the
 trajectory origin is latched at the hover point.
 
+With --stock the custom controller is never engaged: the runner streams the
+same ramped reference as GUIDED position/velocity/acceleration targets and the
+stock position controller flies it. Takeoff, the settled-handover check and the
+position bounds are shared, so the two controllers differ only in who tracks
+the reference. Each flown case then also records the (traj_t, boot_ms) pairs
+that map the .BIN clock onto the reference clock for EKF scoring.
+
 Usage (inside the drone VM):
     python3 -m indi_harness.sitl.baseline_outer \
         --url tcp:127.0.0.1:5790 --out /tmp/indi_flatness --engage-rc 9 \
@@ -31,7 +38,7 @@ from ..trajectory import Hover
 from .baseline import BATTERY, ALT_M
 from .baseline_cc import engage_custom_controller, _wait_gps_fix
 from .streamer import GuidedStreamer, FlightRecord
-from ..offboard.traj_server import reference_duration
+from ..offboard.traj_server import ramped_reference, reference_duration
 
 
 def _hold(s, duration, origin, on_position=None):
@@ -70,7 +77,7 @@ def _wait_for_settled_handover(conn, duration=5.0, history=2.0,
 
 
 def run_battery_outer(url, out_dir, engage_rc=9, ready_file=None,
-                      cases=None, settle_s=4.0):
+                      cases=None, settle_s=4.0, stock=False):
     out = pathlib.Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     evidence = {
@@ -78,6 +85,7 @@ def run_battery_outer(url, out_dir, engage_rc=9, ready_file=None,
                    "min_altitude_m": 2.0, "max_altitude_m": 14.0,
                    "max_horizontal_displacement_m": 5.0,
                    "runner_timeout_s": 600},
+        "controller": "stock" if stock else "custom",
         "success": False,
     }
     try:
@@ -96,15 +104,18 @@ def run_battery_outer(url, out_dir, engage_rc=9, ready_file=None,
         s.takeoff(ALT_M)
         evidence["handover"] = _wait_for_settled_handover(c)
         print(f"settled handover: {evidence['handover']}", flush=True)
-        print(f"engaging custom controller via RC{engage_rc} (aux 109)", flush=True)
-        engaged = engage_custom_controller(c, engage_rc)
-        if not engaged:
-            # The .BIN du is authoritative, but do not publish DDS readiness
-            # when live engagement itself could not be confirmed.
-            raise RuntimeError("'Custom controller is ON' not confirmed")
-        evidence["indi_settle"] = _wait_for_settled_handover(
-            c, duration=settle_s)
-        print(f"settled INDI before DDS: {evidence['indi_settle']}", flush=True)
+        if not stock:
+            print(f"engaging custom controller via RC{engage_rc} (aux 109)",
+                  flush=True)
+            engaged = engage_custom_controller(c, engage_rc)
+            if not engaged:
+                # The .BIN du is authoritative, but do not publish DDS
+                # readiness when live engagement itself could not be confirmed.
+                raise RuntimeError("'Custom controller is ON' not confirmed")
+            evidence["indi_settle"] = _wait_for_settled_handover(
+                c, duration=settle_s)
+            print(f"settled INDI before DDS: {evidence['indi_settle']}",
+                  flush=True)
 
         flown = []
         for case in cases or BATTERY:
@@ -126,17 +137,27 @@ def run_battery_outer(url, out_dir, engage_rc=9, ready_file=None,
                     json.dumps({"case": case.name,
                                 "origin": [float(x) for x in origin]}))
             hold_s = reference_duration(case)
-            print(f"holding for {case.name} ({hold_s:.1f} s) -- "
-                  f"outer loop flies via DDS", flush=True)
-            try:
-                rec = _hold(s, hold_s, origin,
+            if stock:
+                print(f"streaming {case.name} ({hold_s:.1f} s) -- "
+                      f"stock GUIDED flies it", flush=True)
+                rec = s.fly(ramped_reference(case), hold_s, origin,
                             on_position=check_position)
-            finally:
-                if ready_file is not None:
-                    pathlib.Path(ready_file).unlink(missing_ok=True)
-            flown.append({"case": case.name,
-                          "origin": [float(x) for x in origin],
-                          "n_samples": len(rec.p)})
+            else:
+                print(f"holding for {case.name} ({hold_s:.1f} s) -- "
+                      f"outer loop flies via DDS", flush=True)
+                try:
+                    rec = _hold(s, hold_s, origin,
+                                on_position=check_position)
+                finally:
+                    if ready_file is not None:
+                        pathlib.Path(ready_file).unlink(missing_ok=True)
+            entry = {"case": case.name,
+                     "origin": [float(x) for x in origin],
+                     "n_samples": len(rec.p)}
+            if stock:
+                entry["traj_t"] = [float(t) for t in rec.traj_t]
+                entry["boot_ms"] = [float(t) for t in rec.boot_ms]
+            flown.append(entry)
             time.sleep(3.0)
 
         ch = [65535] * 9
@@ -161,13 +182,16 @@ def main():
                     help="written with {case,origin} once hovering+engaged")
     ap.add_argument("--cases", default=None,
                     help="comma-separated case names (default: full battery)")
+    ap.add_argument("--stock", action="store_true",
+                    help="fly the reference with stock GUIDED; never engage")
     args = ap.parse_args()
     cases = None
     if args.cases:
         names = set(args.cases.split(","))
         cases = [c for c in BATTERY if c.name in names]
     run_battery_outer(args.url, args.out, engage_rc=args.engage_rc,
-                      ready_file=args.ready_file, cases=cases)
+                      ready_file=args.ready_file, cases=cases,
+                      stock=args.stock)
 
 
 if __name__ == "__main__":
