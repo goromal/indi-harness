@@ -28,10 +28,12 @@ class FlightRecord:
 
 
 class GuidedStreamer:
-    def __init__(self, conn, rate_hz=50.0, realtime=True):
+    def __init__(self, conn, rate_hz=50.0, realtime=True, clock=time.monotonic,
+                 sleep=time.sleep):
         """conn: mavutil connection (or duck-typed fake). realtime=False skips
         sleeps so offline tests run instantly."""
         self.conn, self.rate_hz, self.realtime = conn, rate_hz, realtime
+        self._clock, self._sleep_fn = clock, sleep
 
     @classmethod
     def connect(cls, url="tcp:127.0.0.1:5790", rate_hz=50.0):
@@ -41,7 +43,7 @@ class GuidedStreamer:
 
     def _sleep(self, dt):
         if self.realtime and dt > 0:
-            time.sleep(dt)
+            self._sleep_fn(dt)
 
     def _latest(self, msg_type, timeout=2.0):
         """Newest queued `msg_type`, or the next one to arrive. recv_match
@@ -121,6 +123,11 @@ class GuidedStreamer:
         fo0 = traj.ref(0.0)
         dt = 1.0 / self.rate_hz
         n_steps = int(round(duration * self.rate_hz))
+        # Send sample k at elapsed time k*dt. Sleeping a fixed dt after each
+        # send stretches the positions by the loop overhead while their
+        # velocity/acceleration feedforward stays at full rate, so the stock
+        # controller runs ahead of the position stream.
+        start = self._clock()
         for k in range(n_steps):
             t = k * dt
             fo = traj.ref(t)
@@ -141,5 +148,5 @@ class GuidedStreamer:
                 rec.boot_ms.append(m.time_boot_ms)
                 rec.p.append([m.x, m.y, m.z])
                 rec.p_ref.append(p_ref.tolist())
-            self._sleep(dt)
+            self._sleep(start + (k + 1) * dt - self._clock())
         return rec
