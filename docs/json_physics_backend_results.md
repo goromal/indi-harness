@@ -8,8 +8,15 @@ with NED world coordinates and FRD body coordinates.
 This page records the initial August experiments. See the
 [current controller audit](2026-09-12-controller-audit.md) for the later
 mechanical-RPM and freshness fixes, normalized gain checks, and passing
-small-flight regression. A trajectory-level drag-rejection advantage remains
-unproven.
+small-flight regression.
+
+The trajectory-level drag-rejection advantage has since been measured. On
+`circle_fast` and `lemniscate_fast`, with drag on vs off, measured-RPM INDI's
+error track moves 0.02–0.04 m (its run-to-run scatter). Stock GUIDED's moves
+0.23–0.34 m. Write-up:
+[indi_vs_pid_drag_rejection.ipynb](https://github.com/goromal/scratchpad/blob/master/control/indi_vs_pid_drag_rejection.ipynb);
+reproduce with anixpkgs `pkgs/nixos/sitl-envs/indi-drag-rejection-ab.nix` and
+`python3 -m indi_harness.sitl.drag_ab gate`.
 
 ## Simulator implementation
 
